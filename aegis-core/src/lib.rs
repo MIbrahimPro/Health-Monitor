@@ -4,3 +4,4 @@ pub mod rppg;
 pub mod config;
 pub mod context;
 pub mod yolo;
+pub mod posture;

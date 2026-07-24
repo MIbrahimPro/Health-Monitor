@@ -10,6 +10,7 @@ pub struct Config {
     pub show_vitals: bool,
     pub overlay_module: bool,
     pub context_module: bool,
+    pub posture_module: bool,
 }
 
 impl Default for Config {
@@ -19,6 +20,7 @@ impl Default for Config {
             show_vitals: true,
             overlay_module: false,
             context_module: false,
+            posture_module: true,
         }
     }
 }

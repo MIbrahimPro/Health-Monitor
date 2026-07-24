@@ -1,4 +1,5 @@
 use crate::pipeline::{downscale_gray_into, rgb_to_gray_into, FaceBox, FrameAnalyzer};
+use crate::posture::PostureMonitor;
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
 use image::{codecs::jpeg::JpegEncoder, ImageBuffer, Rgb};
@@ -30,6 +31,7 @@ pub struct VitalStats {
     pub face_found: bool,
     pub frame_base64: Option<String>,
     pub fps: f32,
+    pub posture: String,
 }
 
 macro_rules! log_msg {
@@ -145,6 +147,7 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>
 
         // --- Main capture loop ---
         let mut analyzer = FrameAnalyzer::new();
+        let mut posture_monitor = PostureMonitor::new();
         let tracking_start = Instant::now();
         let mut frame_counter: u64 = 0;
         let mut fps_counter = 0u32;
@@ -206,6 +209,12 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>
             let current_face = face_rect.lock().ok().and_then(|guard| *guard);
             let elapsed = tracking_start.elapsed().as_secs_f64();
             let analysis = analyzer.process_frame(decoded.as_raw(), width, height, current_face, elapsed);
+            
+            let mut posture = "Good".to_string();
+            if let Some(face) = current_face {
+                let cy = face.y as f32 + (face.h as f32 / 2.0);
+                posture = posture_monitor.process_frame(face.h as f32, cy, height as f32).as_str().to_string();
+            }
 
             // --- 5. Encode preview frame (every 5th frame, downscaled 2x) ---
             let mut frame_base64 = None;
@@ -266,6 +275,7 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>
                 face_found: analysis.face_found,
                 frame_base64,
                 fps: current_fps,
+                posture,
             };
             if sender.blocking_send(stats).is_err() {
                 log_msg!(log_file, "Channel closed, exiting.");

@@ -90,3 +90,4 @@ Regression rule: `std10 ≤ 5`, `maxJump10 ≤ 2`, `cov10 ≥ 90 %`, 5/5 synthet
 - 2026-07-24: Phase 2 Step 3 - Intent classification engine and SQLite migration
 - 2026-07-24: Phase 2 Step 4 - Scaffold YOLO phone detection module
 - 2026-07-24: Phase 2 Step 5 - Focus panel in dashboard with intent bar, top apps list, and overlay controls
+- 2026-07-24: Phase 3 Step 1 - Posture monitor state machine with calibrated face-box distance/slouch
