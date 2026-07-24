@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { HeroCard } from "./components/HeroCard";
 import { RespCard } from "./components/RespCard";
 import { QualityCard } from "./components/QualityCard";
+import { WaveformCard } from "./components/WaveformCard";
 import "./App.css";
 
 function App() {
@@ -20,7 +21,6 @@ function App() {
   const [snrDb, setSnrDb] = useState<number>(0);
   
   const pulseHistoryRef = useRef<number[]>([]);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const smoothedBpm10Ref = useRef<number | null>(null);
   const smoothedBpm30Ref = useRef<number | null>(null);
   const smoothedBpm60Ref = useRef<number | null>(null);
@@ -72,44 +72,12 @@ function App() {
       if (pulseHistoryRef.current.length > 300) {
         pulseHistoryRef.current.shift();
       }
-      drawOscilloscope();
     });
 
     return () => {
       unlisten.then((f) => f());
     };
   }, []);
-
-  const drawOscilloscope = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const data = pulseHistoryRef.current;
-    if (data.length < 2) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw simple line for now, will be rewritten in Step 4
-    ctx.beginPath();
-    ctx.strokeStyle = "#2DE0A5";
-    ctx.lineWidth = 2;
-    
-    const maxVal = Math.max(...data, 0.001);
-    const minVal = Math.min(...data, -0.001);
-    const range = Math.max(maxVal - minVal, 0.001);
-    const stepX = canvas.width / Math.max(1, data.length - 1);
-
-    for (let i = 0; i < data.length; i++) {
-      const x = i * stepX;
-      const normalized = (data[i] - minVal) / range;
-      const y = canvas.height - (normalized * canvas.height * 0.8 + canvas.height * 0.1);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-  };
 
   async function startTracking() {
     setStatus("Starting...");
@@ -172,15 +140,7 @@ function App() {
 
         <QualityCard quality={quality} snrDb={snrDb} fps={fps} />
 
-        <div className="card waveform-card">
-          <h2 className="card-title">rPPG Waveform</h2>
-          <div style={{ flex: 1, position: 'relative' }}>
-            <canvas 
-              ref={canvasRef} 
-              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} 
-            />
-          </div>
-        </div>
+        <WaveformCard pulseHistoryRef={pulseHistoryRef} snrDb={snrDb} />
 
         <div className="card camera-card">
           <h2 className="card-title">Camera Feed</h2>

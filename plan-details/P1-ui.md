@@ -88,7 +88,7 @@ Rules: backgrounds only from `--bg-*`; never pure #000/#fff; text only the three
 **Verify:** dev run with face in view ≥30 s: respiration shows a plausible 10–20, ring fills as signal stabilizes.
 **Commit:** `Respiration and signal-quality cards with animated ring and live SNR`
 
-## Step 4 — Cinematic waveform `[ ]`
+## Step 4 — Cinematic waveform `[x]`
 
 **Instructions:** rewrite the oscilloscope canvas renderer:
 1. Render loop via `requestAnimationFrame` (not per-event), reading from `pulseHistoryRef`; devicePixelRatio-aware canvas sizing (`canvas.width = clientWidth * dpr`).
