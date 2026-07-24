@@ -1,6 +1,7 @@
 use crate::pipeline::{downscale_gray_into, rgb_to_gray_into, FaceBox, FrameAnalyzer};
 use crate::posture::PostureMonitor;
 use crate::emotion::EmotionMonitor;
+use crate::facerec::FaceRecognizer;
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
 use image::{codecs::jpeg::JpegEncoder, ImageBuffer, Rgb};
@@ -34,6 +35,8 @@ pub struct VitalStats {
     pub fps: f32,
     pub posture: String,
     pub emotion: Option<String>,
+    pub owner_present: Option<bool>,
+    pub face_count: u32,
 }
 
 macro_rules! log_msg {
@@ -139,7 +142,7 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>
                         let fh = ((bbox.height().max(0) as u32) * factor).min(full_h - y);
                         FaceBox { x, y, w: fw, h: fh }
                     });
-
+                
                 if let Ok(mut rect) = face_rect_for_detect.lock() {
                     *rect = result;
                 }
@@ -151,6 +154,7 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>
         let mut analyzer = FrameAnalyzer::new();
         let mut posture_monitor = PostureMonitor::new();
         let mut emotion_monitor = EmotionMonitor::new();
+        let face_recognizer = FaceRecognizer::new();
         let tracking_start = Instant::now();
         let mut frame_counter: u64 = 0;
         let mut fps_counter = 0u32;
@@ -215,12 +219,16 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>
             
             let mut posture = "Good".to_string();
             let mut emotion = None;
+            let mut owner_present = None;
+            let mut face_count = 0;
             if let Some(face) = current_face {
+                face_count = 1; // Simplification since rustface pipeline above isn't easily modified
                 let cy = face.y as f32 + (face.h as f32 / 2.0);
                 posture = posture_monitor.process_frame(face.h as f32, cy, height as f32).as_str().to_string();
                 
                 // Only run emotion if we have face box, though deferred execution
                 emotion = emotion_monitor.process_frame(decoded.as_raw(), width, height, face.x, face.y, face.w, face.h);
+                owner_present = face_recognizer.is_owner_present(decoded.as_raw(), width, height, face.x, face.y, face.w, face.h);
             }
 
             // --- 5. Encode preview frame (every 5th frame, downscaled 2x) ---
@@ -284,6 +292,8 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>
                 fps: current_fps,
                 posture,
                 emotion,
+                owner_present,
+                face_count,
             };
             if sender.blocking_send(stats).is_err() {
                 log_msg!(log_file, "Channel closed, exiting.");

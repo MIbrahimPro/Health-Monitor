@@ -7,3 +7,4 @@ pub mod yolo;
 pub mod posture;
 pub mod emotion;
 pub mod music;
+pub mod facerec;
