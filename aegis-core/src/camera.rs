@@ -141,8 +141,10 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
                     let y = ((bbox.y().max(0) as u32) * factor).min(h.saturating_sub(1));
                     let fw = ((bbox.width().max(0) as u32) * factor).min(w - x);
                     let fh = ((bbox.height().max(0) as u32) * factor).min(h - y);
-                    // Forehead ROI: top 30% of face
-                    let roi_h = (fh as f32 * 0.3).max(2.0) as u32;
+                    // Rustface bounds usually start at the eyebrows and end at the chin.
+                    // We want the upper cheeks and nose/forehead, avoiding the beard.
+                    // Let's take the top 60% of the bounding box.
+                    let roi_h = (fh as f32 * 0.6).max(2.0) as u32;
                     Some((x, y, fw, roi_h))
                 } else {
                     None
@@ -262,19 +264,15 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
                             fallback_b += b;
                             fallback_c += 1.0;
 
-                            // Advanced Skin Mask (Kovac et al. modified for low light):
-                            // 1. R > G > B (Human skin reflects more red)
-                            // 2. Reject pure black hair / dark shadows (R > 40, G > 20)
-                            // 3. Ensure color isn't purely grayscale background (max - min > 10)
-                            // 4. Ensure it's not a yellow/white wall (abs(R - G) > 10)
+                            // Relaxed Skin Mask for heavy shadows:
+                            // We just want to reject the white/yellow bright window light
+                            // and totally black background noise.
                             let max_val = r.max(g).max(b);
                             let min_val = r.min(g).min(b);
                             
-                            if r > g && r > b 
-                               && r > 40.0 && g > 20.0 
-                               && (max_val - min_val) > 10.0 
-                               && (r - g).abs() > 10.0 
-                            {
+                            // 1. Must have some brightness (not absolute pitch black)
+                            // 2. Red must be the dominant channel (or extremely close) to reject the bright white window
+                            if max_val > 10.0 && r >= g && r >= b {
                                 sum_r += r;
                                 sum_g += g;
                                 sum_b += b;
