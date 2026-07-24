@@ -1,4 +1,4 @@
-use crate::pipeline::{downscale_gray, rgb_to_gray, FaceBox, FrameAnalyzer};
+use crate::pipeline::{downscale_gray_into, rgb_to_gray_into, FaceBox, FrameAnalyzer};
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
 use image::{codecs::jpeg::JpegEncoder, ImageBuffer, Rgb};
@@ -150,6 +150,10 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>
         let mut fps_counter = 0u32;
         let mut fps_timer = Instant::now();
         let mut current_fps: f32 = 0.0;
+        
+        let mut gray_full = Vec::new();
+        let mut gray_downscaled = Vec::new();
+        let mut preview_buf = Vec::new();
 
         log_msg!(log_file, "Entering main capture loop.");
         loop {
@@ -193,9 +197,9 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>
             // --- 3. Send to face detection thread (non-blocking, every 10th frame) ---
             if frame_counter % 10 == 0 {
                 let factor = if width >= 640 { 2 } else { 1 };
-                let gray_full = rgb_to_gray(decoded.as_raw(), width, height);
-                let (gray, gw, gh) = downscale_gray(&gray_full, width, height, factor);
-                let _ = detect_tx.try_send((gray, gw, gh, factor));
+                rgb_to_gray_into(decoded.as_raw(), width, height, &mut gray_full);
+                let (gw, gh) = downscale_gray_into(&gray_full, width, height, factor, &mut gray_downscaled);
+                let _ = detect_tx.try_send((gray_downscaled.clone(), gw, gh, factor));
             }
 
             // --- 4. Read latest detection + run the shared analysis pipeline ---
@@ -209,15 +213,15 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>
                 let pf = if width >= 640 { 2u32 } else { 1 };
                 let (pw, ph) = (width / pf, height / pf);
                 let src = decoded.as_raw();
-                let mut preview = Vec::with_capacity((pw * ph * 3) as usize);
+                preview_buf.clear();
                 for y in 0..ph {
                     let row = ((y * pf) * width) as usize * 3;
                     for x in 0..pw {
                         let idx = row + (x * pf) as usize * 3;
-                        preview.extend_from_slice(&src[idx..idx + 3]);
+                        preview_buf.extend_from_slice(&src[idx..idx + 3]);
                     }
                 }
-                if let Some(mut display_img) = ImageBuffer::<Rgb<u8>, Vec<u8>>::from_raw(pw, ph, preview) {
+                if let Some(mut display_img) = ImageBuffer::<Rgb<u8>, Vec<u8>>::from_raw(pw, ph, std::mem::take(&mut preview_buf)) {
                     // Draw the smoothed ROI actually being sampled
                     if let Some(roi) = analysis.roi {
                         let x1 = (roi.x / pf).min(pw.saturating_sub(1));
@@ -245,6 +249,8 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>
                     if encoder.encode_image(&display_img).is_ok() {
                         frame_base64 = Some(general_purpose::STANDARD.encode(buf.into_inner()));
                     }
+                    
+                    preview_buf = display_img.into_raw();
                 }
             }
 

@@ -224,11 +224,31 @@ pub fn downscale_gray(pixels: &[u8], width: u32, height: u32, factor: u32) -> (V
 /// Convert an RGB24 buffer to grayscale (BT.601 luma).
 pub fn rgb_to_gray(rgb: &[u8], width: u32, height: u32) -> Vec<u8> {
     let mut gray = Vec::with_capacity((width * height) as usize);
+    rgb_to_gray_into(rgb, width, height, &mut gray);
+    gray
+}
+
+/// Convert an RGB24 buffer to grayscale into an existing buffer.
+pub fn rgb_to_gray_into(rgb: &[u8], _width: u32, _height: u32, gray: &mut Vec<u8>) {
+    gray.clear();
     for px in rgb.chunks_exact(3) {
         let r = px[0] as f32;
         let g = px[1] as f32;
         let b = px[2] as f32;
         gray.push((r * 0.299 + g * 0.587 + b * 0.114) as u8);
     }
-    gray
+}
+
+/// Downscale a grayscale image into an existing buffer.
+pub fn downscale_gray_into(pixels: &[u8], width: u32, height: u32, factor: u32, out: &mut Vec<u8>) -> (u32, u32) {
+    let new_w = width / factor;
+    let new_h = height / factor;
+    out.clear();
+    for y in 0..new_h {
+        for x in 0..new_w {
+            let src_idx = ((y * factor) * width + (x * factor)) as usize;
+            out.push(*pixels.get(src_idx).unwrap_or(&0));
+        }
+    }
+    (new_w, new_h)
 }

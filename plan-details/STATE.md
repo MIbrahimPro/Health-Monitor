@@ -64,9 +64,14 @@ Regression rule: `std10 ≤ 5`, `maxJump10 ≤ 2`, `cov10 ≥ 90 %`, 5/5 synthet
 - **Ground-truth HR**: RESOLVED. User confirmed resting HR is approximately 80-100 BPM, mostly on the upper end (assume ~90-95 BPM). The current algorithmic tuning that tracks the ~78.7 BPM peak is therefore highly plausible and confirms the 48-53 BPM readings were indeed subharmonic traps.
 - **P6 companion approach**: RESOLVED. User prefers a Native app, but allows a local PWA if native causes too many build errors. We will attempt a Tauri Mobile (Native) approach first for deeper system integration.
 
+## Performance Tracking (Live Hot Loop)
+- **Before optimization:** 265 fps offline throughput, analyze: 0.35 ms/frame
+- **After optimization:** 279 fps offline throughput, analyze: 0.33 ms/frame (Zero steady-state allocation)
+
 ## Changelog (append one line per completed step)
 
 - 2026-07-24: Benchmark harness + shared pipeline module built; baseline recorded (commit a508bea)
 - 2026-07-24: Engine overhauled — patch-fused POS, bandpass+Welch, harmonic-aware tracker, respiration; 5/5 synthetic tests; std10 25→3.8 (commit 124762d)
 - 2026-07-24: Execution playbook written (P1–P6 step files) + support manuals (CONCEPTS, TESTING, EXPERIMENTS, TROUBLESHOOTING); per user direction, all remaining work is executed FROM these docs
 - 2026-07-24: Add graceful start/stop lifecycle with camera release and double-start guard
+- 2026-07-24: Optimize live hot loop: reuse gray/downscale/preview buffers (zero steady-state alloc)

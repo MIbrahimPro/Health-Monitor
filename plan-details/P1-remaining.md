@@ -56,7 +56,7 @@ Then a manual smoke (needs webcam+display): `cd aegis-ui && npm run tauri dev`, 
 
 ---
 
-## Step 2 — Performance pass on the hot loop `[ ]`
+## Step 2 — Performance pass on the hot loop `[x]`
 
 **Goal:** Reduce per-frame allocation and CPU. Current offline throughput ~230 fps (plenty), but the live path allocates a fresh grayscale Vec every detection and a preview Vec every 5th frame. Target: no avoidable per-frame heap allocation in the steady state.
 
