@@ -12,10 +12,10 @@ interface HeroCardProps {
 }
 
 const getHrColorVar = (val: number | null) => {
-  if (val === null) return "var(--text-low)";
-  if (val < 60) return "var(--accent-2)";
-  if (val > 100) return "var(--danger)";
-  return "var(--accent)";
+  if (val === null) return "#4E5A6B"; // --text-low
+  if (val < 60) return "#4E9CF5"; // --accent-2
+  if (val > 100) return "#F0546C"; // --danger
+  return "#2DE0A5"; // --accent
 };
 
 export const HeroCard: React.FC<HeroCardProps> = ({ bpm10, bpm30, bpm60, faceFound, warmupProgress, isLoading }) => {

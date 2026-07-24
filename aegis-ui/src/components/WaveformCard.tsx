@@ -39,8 +39,8 @@ export const WaveformCard: React.FC<WaveformCardProps> = ({ pulseHistoryRef, snr
 
       // Recreate gradient and pattern
       gradient = ctx.createLinearGradient(0, 0, width, 0);
-      gradient.addColorStop(0, "var(--accent-2)");
-      gradient.addColorStop(1, "var(--accent)");
+      gradient.addColorStop(0, "#4E9CF5");
+      gradient.addColorStop(1, "#2DE0A5");
 
       const patternCanvas = document.createElement("canvas");
       patternCanvas.width = 24 * dpr;
