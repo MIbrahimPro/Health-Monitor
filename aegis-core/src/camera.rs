@@ -163,6 +163,8 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
         let mut fps_timer = Instant::now();
         let mut current_fps: f32 = 0.0;
 
+        let mut smoothed_face_rect: Option<(f32, f32, f32, f32)> = None;
+
         log_msg!(log_file, "Entering main capture loop.");
         loop {
             // --- 1. Capture frame ---
@@ -207,6 +209,23 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
             let current_face = face_rect.lock().ok().and_then(|guard| *guard);
             let face_found = current_face.is_some();
 
+            if let Some((fx, fy, fw, fh)) = current_face {
+                if let Some((sx, sy, sw, sh)) = smoothed_face_rect {
+                    smoothed_face_rect = Some((
+                        sx * 0.9 + (fx as f32) * 0.1,
+                        sy * 0.9 + (fy as f32) * 0.1,
+                        sw * 0.9 + (fw as f32) * 0.1,
+                        sh * 0.9 + (fh as f32) * 0.1,
+                    ));
+                } else {
+                    smoothed_face_rect = Some((fx as f32, fy as f32, fw as f32, fh as f32));
+                }
+            } else {
+                smoothed_face_rect = None;
+            }
+
+            let face_to_use = smoothed_face_rect.map(|(x, y, w, h)| (x as u32, y as u32, w as u32, h as u32));
+
             // --- 5. rPPG processing ---
             let elapsed = tracking_start.elapsed().as_secs_f64();
             let mut raw_pulse = 0.0;
@@ -214,7 +233,7 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
             let mut bpm_30s = None;
             let mut bpm_60s = None;
 
-            if let Some((start_x, start_y, roi_w, roi_h)) = current_face {
+            if let Some((start_x, start_y, roi_w, roi_h)) = face_to_use {
                 let pixels = decoded.as_raw();
                 let end_y = (start_y + roi_h).min(height);
                 let end_x = (start_x + roi_w).min(width);
@@ -223,17 +242,42 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
                 let mut sum_g = 0.0_f64;
                 let mut sum_b = 0.0_f64;
                 let mut count = 0.0_f64;
+                
+                // Fallback counters just in case skin mask fails completely
+                let mut fallback_r = 0.0;
+                let mut fallback_g = 0.0;
+                let mut fallback_b = 0.0;
+                let mut fallback_c = 0.0;
 
                 for y in start_y..end_y {
                     for x in start_x..end_x {
                         let idx = ((y * width + x) * 3) as usize;
                         if idx + 2 < pixels.len() {
-                            sum_r += pixels[idx] as f64;
-                            sum_g += pixels[idx + 1] as f64;
-                            sum_b += pixels[idx + 2] as f64;
-                            count += 1.0;
+                            let r = pixels[idx] as f64;
+                            let g = pixels[idx + 1] as f64;
+                            let b = pixels[idx + 2] as f64;
+                            
+                            fallback_r += r;
+                            fallback_g += g;
+                            fallback_b += b;
+                            fallback_c += 1.0;
+
+                            // Skin Mask: Human skin reflects more Red than Green/Blue in ANY lighting
+                            if r > g && r > b {
+                                sum_r += r;
+                                sum_g += g;
+                                sum_b += b;
+                                count += 1.0;
+                            }
                         }
                     }
+                }
+
+                if count < 10.0 {
+                    sum_r = fallback_r;
+                    sum_g = fallback_g;
+                    sum_b = fallback_b;
+                    count = fallback_c;
                 }
 
                 if count > 0.0 {
