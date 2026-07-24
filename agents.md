@@ -53,6 +53,35 @@ scripts/                  → Directory for temporary utility scripts (e.g., tes
 
 ---
 
+### Session: Evening 2026-07-24 — Engine overhaul + execution playbook
+
+**Measurement infrastructure first:** built `bench_rppg` (offline harness streaming
+`tests/test_video.avi` through the exact production pipeline via a shared
+`pipeline.rs` module) + 5 synthetic-signal cargo tests with known ground truth.
+
+**Key discoveries (evidence-driven, do not re-litigate):**
+1. The webcam delivers ~16.6 fps although it claims 30 — the AVI fixture's 2985
+   frames span 180 s wall time. All engine timing is wall-clock now.
+2. The fixture is lossy mpeg4/yuv420p recorded in the dark: codec noise ≈ pulse
+   amplitude, so absolute HR on it is ambiguous (candidates 53/70/78.7 BPM).
+   It is a stability/perf regression fixture; synthetic tests carry accuracy.
+3. The old "reads 40–50" bug was largely a **breathing-motion harmonic lock**
+   (measured 16.5 breaths/min × 3 ≈ 48 "BPM"). The engine now estimates
+   respiration and penalizes its harmonics during peak selection.
+
+**Engine rewrite (rppg.rs):** true POS w/ incremental overlap-add (no alpha
+flutter), 3×3 skin-patch grid with SNR-weighted Welch-PSD fusion, Butterworth
+bandpass, harmonic-aware scored peak selection, slew-limited confidence-gated
+trackers, respiration output, quality/SNR output. Camera captures 640×480
+(4× skin pixels), detects on 2× downscale. Results on the fixture:
+BPM std 25.3→3.8, max jump 5.0→1.4, production SNR −10.9→−4.0 dB, 5/5 tests.
+
+**Working mode change (user request):** detailed execution docs now live in
+`plan-details/` (STATE.md + per-phase step files with verify blocks and failure
+branches) so remaining work can be executed step-by-step by any developer/model.
+
+---
+
 ### Session: Later on 2026-07-24
 
 #### Bug #4: Subharmonic Heart Rate Locking (Reads 40-50 instead of 80+) (RESOLVED)

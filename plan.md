@@ -4,6 +4,12 @@
 
 This document serves as the master blueprint. It is designed to be highly technical and structured into distinct phases so that AI coding assistants can consume a single phase and implement it accurately.
 
+> **▶ EXECUTION STATUS & PLAYBOOK:** implementation now follows the step-by-step
+> playbook in **`plan-details/`** (start at `plan-details/STATE.md`). Phase 1's
+> vitals engine is complete and benchmarked (true POS patch fusion, respiration,
+> harmonic-aware tracking — see git history); remaining Phase 1 backend/UI work
+> and all later phases have junior-proof step files there.
+
 ## Core Tech Stack
 *   **Language:** Rust (for the core daemon, memory safety, and native OS APIs).
 *   **Desktop UI:** Tauri (for a lightweight, web-based system tray dashboard).
