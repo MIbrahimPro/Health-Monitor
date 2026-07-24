@@ -75,15 +75,11 @@ impl PosRppg {
         let x = 3.0 * &r_n - 2.0 * &g_n;
         let y = 1.5 * &r_n + &g_n - 1.5 * &b_n;
 
-        let x_std = x.std(0.0);
-        let y_std = y.std(0.0);
-
-        if y_std < 1e-10 {
-            return (0.0, self.smoothed_bpm_10s, self.smoothed_bpm_30s, self.smoothed_bpm_60s);
-        }
-
-        let alpha = x_std / y_std;
-        let h = &x - alpha * &y;
+        // Use the primary chrominance channel (3R - 2G) which contains the strongest
+        // pulsatile component. We skip the alpha * Y subtraction because in a sliding window
+        // the alpha value fluctuates rapidly, creating massive low-frequency amplitude modulation
+        // that destroys the FFT. Illumination drift is instead handled by our IIR high-pass filter.
+        let h = x;
 
         let pulse_val = *h.last().unwrap_or(&0.0);
 
@@ -193,18 +189,22 @@ impl PosRppg {
             return 0.0;
         }
 
-        // 1. Compute moving average (window = target_fps, approx 1 second)
-        let ma_window = target_fps as usize;
+        // 1. High-pass filter (cutoff ~0.5 Hz) to remove DC and slow drift
+        // Using a 1st-order IIR filter: y[i] = alpha * (y[i-1] + x[i] - x[i-1])
+        let fc = 0.5; // cutoff frequency in Hz
+        let rc = 1.0 / (2.0 * std::f64::consts::PI * fc);
+        let dt_filter = 1.0 / target_fps as f64;
+        let alpha = (rc / (rc + dt_filter)) as f32;
+
         let mut detrended = Vec::with_capacity(n);
-        for i in 0..n {
-            let start = i.saturating_sub(ma_window / 2);
-            let end = (i + ma_window / 2).min(n - 1);
-            let mut sum = 0.0;
-            for j in start..=end {
-                sum += uniform_pulse[j];
+        if n > 0 {
+            detrended.push(0.0);
+            for i in 1..n {
+                let y_prev = detrended[i - 1];
+                let x_curr = uniform_pulse[i];
+                let x_prev = uniform_pulse[i - 1];
+                detrended.push(alpha * (y_prev + x_curr - x_prev));
             }
-            let avg = sum / (end - start + 1) as f32;
-            detrended.push(uniform_pulse[i] - avg);
         }
 
         let n_padded = 2048; // Zero-pad for extreme frequency resolution
