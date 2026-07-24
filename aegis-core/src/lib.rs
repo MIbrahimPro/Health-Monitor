@@ -11,3 +11,4 @@ pub mod facerec;
 pub mod biometrics;
 pub mod sonar;
 pub mod csi;
+pub mod server;

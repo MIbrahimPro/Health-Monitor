@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "aegis-core",
+    "aegis-core", "aegis-daemon",
     "aegis-ui/src-tauri"
 ]
 resolver = "2"
