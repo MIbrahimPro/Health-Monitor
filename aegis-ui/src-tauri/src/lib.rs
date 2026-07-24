@@ -1,4 +1,5 @@
 use aegis_core::camera::start_camera_loop;
+use aegis_core::context::{start_context_loop, get_context_summary as core_get_context_summary};
 use aegis_core::config::Config;
 use chrono::{Local, Timelike};
 use serde::Serialize;
@@ -46,10 +47,12 @@ fn start_tracking(app: AppHandle, state: State<'_, AppState>) -> String {
 
     let (tx, mut rx) = mpsc::channel(100);
 
-    if let Err(e) = start_camera_loop(tx, stop_flag) {
+    if let Err(e) = start_camera_loop(tx, stop_flag.clone()) {
         state.running.store(false, Ordering::Relaxed);
         return format!("Failed to start camera loop: {:?}", e);
     }
+
+    start_context_loop(stop_flag.clone());
 
     tauri::async_runtime::spawn(async move {
         while let Some(stats) = rx.recv().await {
@@ -170,6 +173,11 @@ fn overlay_set_warmth(app: AppHandle, warmth: f32) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn get_context_summary(hours: f64) -> Vec<(String, u64)> {
+    core_get_context_summary(hours)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -230,7 +238,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             start_tracking, stop_tracking, get_config, set_config,
-            overlay_enable, overlay_disable, overlay_set_warmth
+            overlay_enable, overlay_disable, overlay_set_warmth,
+            get_context_summary
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
