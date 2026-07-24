@@ -18,3 +18,4 @@ dirs = "5.0"
 rusqlite = { version = "0.40.1", features = ["bundled"] }
 rodio = "0.17"
 symphonia = { version = "0.5", features = ["mp3", "flac", "isomp4", "aac"] }
+rdev = "0.5"

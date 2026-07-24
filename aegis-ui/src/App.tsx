@@ -7,6 +7,7 @@ import { QualityCard } from "./components/QualityCard";
 import { WaveformCard } from "./components/WaveformCard";
 import { FocusCard } from "./components/FocusCard";
 import { MusicCard } from "./components/MusicCard";
+import { SecurityCard } from "./components/SecurityCard";
 import "./App.css";
 
 function App() {
@@ -21,6 +22,8 @@ function App() {
   const [respBpm, setRespBpm] = useState<number | null>(null);
   const [quality, setQuality] = useState<number>(0);
   const [snrDb, setSnrDb] = useState<number>(0);
+  const [ownerPresent, setOwnerPresent] = useState<boolean | null>(null);
+  const [faceCount, setFaceCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
   useEffect(() => {
@@ -46,6 +49,8 @@ function App() {
       resp_bpm: number | null;
       quality: number;
       snr_db: number;
+      owner_present: boolean | null;
+      face_count: number;
     }>("pulse-update", (event) => {
       const p = event.payload;
 
@@ -55,6 +60,8 @@ function App() {
       setRespBpm(p.resp_bpm);
       setQuality(p.quality);
       setSnrDb(p.snr_db);
+      setOwnerPresent(p.owner_present);
+      setFaceCount(p.face_count);
 
       frameCountRef.current += 1;
       if (p.face_found) {
@@ -188,6 +195,8 @@ function App() {
         <FocusCard />
         
         <MusicCard />
+
+        <SecurityCard ownerPresent={ownerPresent} faceCount={faceCount} jsdScore={0.05} />
       </div>
     </div>
   );
