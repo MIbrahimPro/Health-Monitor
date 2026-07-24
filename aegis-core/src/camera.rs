@@ -1,4 +1,4 @@
-use crate::pipeline::{rgb_to_gray, FaceBox, FrameAnalyzer};
+use crate::pipeline::{downscale_gray, rgb_to_gray, FaceBox, FrameAnalyzer};
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
 use image::{codecs::jpeg::JpegEncoder, ImageBuffer, Rgb};
@@ -20,6 +20,12 @@ pub struct VitalStats {
     pub bpm_10s: Option<f32>,
     pub bpm_30s: Option<f32>,
     pub bpm_60s: Option<f32>,
+    /// Respiration rate, breaths per minute.
+    pub resp_bpm: Option<f32>,
+    /// Signal quality 0–100.
+    pub quality: f32,
+    /// SNR (dB) of the latest 10 s spectral estimate.
+    pub snr_db: f32,
     pub face_found: bool,
     pub frame_base64: Option<String>,
     pub fps: f32,
@@ -65,8 +71,10 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
         log_msg!(log_file, "--- AEGIS CAMERA LOOP STARTED ---");
 
         // --- Camera setup ---
+        // Capture at full 640x480: rPPG samples 4x more skin pixels (2x SNR).
+        // Face detection runs on a 2x-downscaled copy, so it stays fast.
         let index = CameraIndex::Index(0);
-        let format = CameraFormat::new(Resolution::new(320, 240), FrameFormat::YUYV, 30);
+        let format = CameraFormat::new(Resolution::new(640, 480), FrameFormat::YUYV, 30);
         let requested = RequestedFormat::new::<RgbFormat>(RequestedFormatType::Closest(format));
 
         let mut camera = match Camera::new(index, requested) {
@@ -97,7 +105,7 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
         let face_rect_for_detect = face_rect.clone();
 
         // Channel to send grayscale frames to the detection thread
-        let (detect_tx, detect_rx) = std_mpsc::sync_channel::<(Vec<u8>, u32, u32)>(1);
+        let (detect_tx, detect_rx) = std_mpsc::sync_channel::<(Vec<u8>, u32, u32, u32)>(1);
 
         // --- Face detection on a separate thread (rustface is slow) ---
         std::thread::spawn(move || {
@@ -108,19 +116,22 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
             detector.set_min_face_size(30);
             detector.set_score_thresh(2.0);
 
-            while let Ok((gray, w, h)) = detect_rx.recv() {
+            while let Ok((gray, w, h, factor)) = detect_rx.recv() {
                 let mut image_data = ImageData::new(&gray, w, h);
                 let faces = detector.detect(&mut image_data);
 
+                // Scale detection coordinates back to full capture resolution.
+                let full_w = w * factor;
+                let full_h = h * factor;
                 let result = faces
                     .into_iter()
                     .max_by_key(|f| f.bbox().width() * f.bbox().height())
                     .map(|face| {
                         let bbox = face.bbox();
-                        let x = (bbox.x().max(0) as u32).min(w.saturating_sub(1));
-                        let y = (bbox.y().max(0) as u32).min(h.saturating_sub(1));
-                        let fw = (bbox.width().max(0) as u32).min(w - x);
-                        let fh = (bbox.height().max(0) as u32).min(h - y);
+                        let x = ((bbox.x().max(0) as u32) * factor).min(full_w.saturating_sub(1));
+                        let y = ((bbox.y().max(0) as u32) * factor).min(full_h.saturating_sub(1));
+                        let fw = ((bbox.width().max(0) as u32) * factor).min(full_w - x);
+                        let fh = ((bbox.height().max(0) as u32) * factor).min(full_h - y);
                         FaceBox { x, y, w: fw, h: fh }
                     });
 
@@ -175,8 +186,10 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
 
             // --- 3. Send to face detection thread (non-blocking, every 10th frame) ---
             if frame_counter % 10 == 0 {
-                let gray = rgb_to_gray(decoded.as_raw(), width, height);
-                let _ = detect_tx.try_send((gray, width, height));
+                let factor = if width >= 640 { 2 } else { 1 };
+                let gray_full = rgb_to_gray(decoded.as_raw(), width, height);
+                let (gray, gw, gh) = downscale_gray(&gray_full, width, height, factor);
+                let _ = detect_tx.try_send((gray, gw, gh, factor));
             }
 
             // --- 4. Read latest detection + run the shared analysis pipeline ---
@@ -184,26 +197,36 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
             let elapsed = tracking_start.elapsed().as_secs_f64();
             let analysis = analyzer.process_frame(decoded.as_raw(), width, height, current_face, elapsed);
 
-            // --- 5. Encode video frame (every 5th frame) ---
+            // --- 5. Encode preview frame (every 5th frame, downscaled 2x) ---
             let mut frame_base64 = None;
             if frame_counter % 5 == 0 {
-                let img_vec = decoded.as_raw().to_vec();
-                if let Some(mut display_img) = ImageBuffer::<Rgb<u8>, Vec<u8>>::from_raw(width, height, img_vec) {
+                let pf = if width >= 640 { 2u32 } else { 1 };
+                let (pw, ph) = (width / pf, height / pf);
+                let src = decoded.as_raw();
+                let mut preview = Vec::with_capacity((pw * ph * 3) as usize);
+                for y in 0..ph {
+                    let row = ((y * pf) * width) as usize * 3;
+                    for x in 0..pw {
+                        let idx = row + (x * pf) as usize * 3;
+                        preview.extend_from_slice(&src[idx..idx + 3]);
+                    }
+                }
+                if let Some(mut display_img) = ImageBuffer::<Rgb<u8>, Vec<u8>>::from_raw(pw, ph, preview) {
                     // Draw the smoothed ROI actually being sampled
                     if let Some(roi) = analysis.roi {
-                        let x1 = roi.x.min(width.saturating_sub(1));
-                        let y1 = roi.y.min(height.saturating_sub(1));
-                        let x2 = (roi.x + roi.w).min(width.saturating_sub(1));
-                        let y2 = (roi.y + roi.h).min(height.saturating_sub(1));
+                        let x1 = (roi.x / pf).min(pw.saturating_sub(1));
+                        let y1 = (roi.y / pf).min(ph.saturating_sub(1));
+                        let x2 = ((roi.x + roi.w) / pf).min(pw.saturating_sub(1));
+                        let y2 = ((roi.y + roi.h) / pf).min(ph.saturating_sub(1));
                         for t in 0..2u32 {
-                            let y1t = y1.saturating_sub(t).min(height.saturating_sub(1));
-                            let y2t = (y2 + t).min(height.saturating_sub(1));
+                            let y1t = y1.saturating_sub(t).min(ph.saturating_sub(1));
+                            let y2t = (y2 + t).min(ph.saturating_sub(1));
                             for x in x1..=x2 {
                                 display_img.put_pixel(x, y1t, Rgb([0, 255, 0]));
                                 display_img.put_pixel(x, y2t, Rgb([0, 255, 0]));
                             }
-                            let x1t = x1.saturating_sub(t).min(width.saturating_sub(1));
-                            let x2t = (x2 + t).min(width.saturating_sub(1));
+                            let x1t = x1.saturating_sub(t).min(pw.saturating_sub(1));
+                            let x2t = (x2 + t).min(pw.saturating_sub(1));
                             for y in y1..=y2 {
                                 display_img.put_pixel(x1t, y, Rgb([0, 255, 0]));
                                 display_img.put_pixel(x2t, y, Rgb([0, 255, 0]));
@@ -212,7 +235,7 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
                     }
 
                     let mut buf = Cursor::new(Vec::new());
-                    let mut encoder = JpegEncoder::new_with_quality(&mut buf, 40);
+                    let mut encoder = JpegEncoder::new_with_quality(&mut buf, 55);
                     if encoder.encode_image(&display_img).is_ok() {
                         frame_base64 = Some(general_purpose::STANDARD.encode(buf.into_inner()));
                     }
@@ -225,6 +248,9 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
                 bpm_10s: analysis.bpm_10s,
                 bpm_30s: analysis.bpm_30s,
                 bpm_60s: analysis.bpm_60s,
+                resp_bpm: analysis.resp_bpm,
+                quality: analysis.quality,
+                snr_db: analysis.snr_db,
                 face_found: analysis.face_found,
                 frame_base64,
                 fps: current_fps,

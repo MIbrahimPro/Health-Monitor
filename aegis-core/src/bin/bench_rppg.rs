@@ -13,7 +13,7 @@
 //! ~16 fps while the AVI header claims 30, which would inflate BPM by ~1.8x.
 
 use aegis_core::camera::find_face_model;
-use aegis_core::pipeline::{rgb_to_gray, FaceBox, FrameAnalyzer};
+use aegis_core::pipeline::{downscale_gray, rgb_to_gray, FaceBox, FrameAnalyzer};
 use anyhow::{bail, Context, Result};
 use rustface::ImageData;
 use rustfft::{num_complex::Complex, FftPlanner};
@@ -21,8 +21,6 @@ use std::io::Read;
 use std::process::{Command, Stdio};
 use std::time::Instant;
 
-const PROC_W: u32 = 320;
-const PROC_H: u32 = 240;
 const BAND_LO: f64 = 0.7; // Hz (42 BPM)
 const BAND_HI: f64 = 3.0; // Hz (180 BPM)
 
@@ -33,6 +31,7 @@ struct Args {
     label: String,
     csv: Option<String>,
     detect_every: u64,
+    dump_rois: Option<String>,
 }
 
 fn parse_args() -> Args {
@@ -43,6 +42,7 @@ fn parse_args() -> Args {
         label: "run".into(),
         csv: None,
         detect_every: 10,
+        dump_rois: None,
     };
     let argv: Vec<String> = std::env::args().collect();
     let mut i = 1;
@@ -55,6 +55,7 @@ fn parse_args() -> Args {
             "--label" => { args.label = argv[i + 1].clone(); i += 2; }
             "--csv" => { args.csv = Some(argv[i + 1].clone()); i += 2; }
             "--detect-every" => { args.detect_every = argv[i + 1].parse().expect("bad --detect-every"); i += 2; }
+            "--dump-rois" => { args.dump_rois = Some(argv[i + 1].clone()); i += 2; }
             other => { eprintln!("Unknown arg: {}", other); std::process::exit(2); }
         }
     }
@@ -239,6 +240,103 @@ fn snr_db(df: f64, psd: &[f64], f0: f64) -> f64 {
 }
 
 // ---------------------------------------------------------------------------
+// Multi-ROI experiment dump: samples several candidate face regions per frame
+// (EMA-smoothed like production) so extraction geometry can be compared offline.
+// ---------------------------------------------------------------------------
+
+const ROI_NAMES: [&str; 5] = ["upper60", "forehead", "cheeks", "midband", "fhcheeks"];
+const MASK_NAMES: [&str; 2] = ["loose", "strict"];
+
+struct RoiDump {
+    smoothed: Option<(f32, f32, f32, f32)>,
+    rows: Vec<String>,
+}
+
+impl RoiDump {
+    fn new() -> Self {
+        Self { smoothed: None, rows: Vec::new() }
+    }
+
+    fn header() -> String {
+        let mut h = String::from("frame,t,face");
+        for roi in ROI_NAMES {
+            for mask in MASK_NAMES {
+                h.push_str(&format!(",{roi}_{mask}_r,{roi}_{mask}_g,{roi}_{mask}_b,{roi}_{mask}_n"));
+            }
+        }
+        h.push('\n');
+        h
+    }
+
+    fn record(&mut self, rgb: &[u8], w: u32, h: u32, face: Option<FaceBox>, frame: u64, t: f64) {
+        match (face, self.smoothed) {
+            (Some(f), Some((sx, sy, sw, sh))) => {
+                self.smoothed = Some((
+                    sx * 0.9 + f.x as f32 * 0.1,
+                    sy * 0.9 + f.y as f32 * 0.1,
+                    sw * 0.9 + f.w as f32 * 0.1,
+                    sh * 0.9 + f.h as f32 * 0.1,
+                ));
+            }
+            (Some(f), None) => self.smoothed = Some((f.x as f32, f.y as f32, f.w as f32, f.h as f32)),
+            (None, _) => self.smoothed = None,
+        }
+
+        let mut row = format!("{},{:.3},{}", frame, t, self.smoothed.is_some() as u8);
+        if let Some((fx, fy, fw, fh)) = self.smoothed {
+            // Candidate regions, expressed in face-box fractions. The rustface
+            // box spans roughly eyebrows→chin, so "forehead" extends above it.
+            let regions: [Vec<(f32, f32, f32, f32)>; 5] = [
+                vec![(0.0, 0.0, 1.0, 0.6)],                       // upper60 (current prod)
+                vec![(0.22, -0.24, 0.56, 0.26)],                  // forehead (above box)
+                vec![(0.06, 0.42, 0.30, 0.28), (0.64, 0.42, 0.30, 0.28)], // both cheeks
+                vec![(0.05, 0.35, 0.90, 0.38)],                   // midface band
+                vec![(0.22, -0.24, 0.56, 0.26), (0.06, 0.42, 0.30, 0.28), (0.64, 0.42, 0.30, 0.28)], // forehead+cheeks
+            ];
+            for patches in &regions {
+                for strict in [false, true] {
+                    let (mut sr, mut sg, mut sb, mut n) = (0.0f64, 0.0f64, 0.0f64, 0u64);
+                    for &(rx, ry, rw, rh) in patches {
+                        let x0 = (fx + rx * fw).max(0.0) as u32;
+                        let y0 = (fy + ry * fh).max(0.0) as u32;
+                        let x1 = ((fx + (rx + rw) * fw).max(0.0) as u32).min(w);
+                        let y1 = ((fy + (ry + rh) * fh).max(0.0) as u32).min(h);
+                        for y in y0..y1 {
+                            let rowbase = (y * w) as usize * 3;
+                            for x in x0..x1 {
+                                let idx = rowbase + x as usize * 3;
+                                if idx + 2 < rgb.len() {
+                                    let r = rgb[idx] as f64;
+                                    let g = rgb[idx + 1] as f64;
+                                    let b = rgb[idx + 2] as f64;
+                                    let keep = if strict {
+                                        r > g + 4.0 && r > b + 4.0 && r.max(g).max(b) > 20.0 && r < 250.0
+                                    } else {
+                                        r.max(g).max(b) > 10.0 && r >= g && r >= b
+                                    };
+                                    if keep {
+                                        sr += r; sg += g; sb += b; n += 1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if n > 0 {
+                        row.push_str(&format!(",{:.3},{:.3},{:.3},{}", sr / n as f64, sg / n as f64, sb / n as f64, n));
+                    } else {
+                        row.push_str(",,,,0");
+                    }
+                }
+            }
+        } else {
+            for _ in 0..ROI_NAMES.len() * MASK_NAMES.len() {
+                row.push_str(",,,,0");
+            }
+        }
+        row.push('\n');
+        self.rows.push(row);
+    }
+}
 
 #[derive(Default)]
 struct TimelineStats {
@@ -321,17 +419,18 @@ fn main() -> Result<()> {
         else { "container rate".to_string() });
     println!("label:  {}", args.label);
 
-    // --- decode pipe: scale to the production 320x240 ---
+    // --- decode pipe at native resolution: rPPG samples full-res pixels,
+    // face detection runs on a 2x-downscaled grayscale (production design) ---
     let mut child = Command::new("ffmpeg")
         .args([
             "-v", "error", "-i", &args.video,
-            "-vf", &format!("scale={}:{}", PROC_W, PROC_H),
             "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
         ])
         .stdout(Stdio::piped())
         .spawn()
         .context("ffmpeg not found — install ffmpeg")?;
     let mut pipe = child.stdout.take().unwrap();
+    let detect_factor: u32 = if src_w >= 640 { 2 } else { 1 };
 
     // --- face detector (identical settings to production) ---
     let model_path = find_face_model().context("rustface model not found — run from repo root")?;
@@ -342,7 +441,7 @@ fn main() -> Result<()> {
 
     let mut analyzer = FrameAnalyzer::new();
 
-    let frame_size = (PROC_W * PROC_H * 3) as usize;
+    let frame_size = (src_w * src_h * 3) as usize;
     let mut buf = vec![0u8; frame_size];
 
     let mut times: Vec<f64> = Vec::new();
@@ -352,8 +451,11 @@ fn main() -> Result<()> {
     let mut bpm10: Vec<Option<f32>> = Vec::new();
     let mut bpm30: Vec<Option<f32>> = Vec::new();
     let mut bpm60: Vec<Option<f32>> = Vec::new();
+    let mut resp: Vec<Option<f32>> = Vec::new();
+    let mut qualities: Vec<f32> = Vec::new();
 
     let mut last_face: Option<FaceBox> = None;
+    let mut roi_dump = RoiDump::new();
     let mut frame_idx: u64 = 0;
     let mut detect_time = 0.0f64;
     let mut detect_calls = 0u64;
@@ -369,18 +471,20 @@ fn main() -> Result<()> {
 
         if frame_idx % args.detect_every == 0 {
             let d0 = Instant::now();
-            let gray = rgb_to_gray(&buf, PROC_W, PROC_H);
-            let mut image_data = ImageData::new(&gray, PROC_W, PROC_H);
+            let gray_full = rgb_to_gray(&buf, src_w, src_h);
+            let (gray, gw, gh) = downscale_gray(&gray_full, src_w, src_h, detect_factor);
+            let mut image_data = ImageData::new(&gray, gw, gh);
             let detections = detector.detect(&mut image_data);
             last_face = detections
                 .into_iter()
                 .max_by_key(|f| f.bbox().width() * f.bbox().height())
                 .map(|face| {
                     let bbox = face.bbox();
-                    let x = (bbox.x().max(0) as u32).min(PROC_W - 1);
-                    let y = (bbox.y().max(0) as u32).min(PROC_H - 1);
-                    let fw = (bbox.width().max(0) as u32).min(PROC_W - x);
-                    let fh = (bbox.height().max(0) as u32).min(PROC_H - y);
+                    let f = detect_factor;
+                    let x = ((bbox.x().max(0) as u32) * f).min(src_w - 1);
+                    let y = ((bbox.y().max(0) as u32) * f).min(src_h - 1);
+                    let fw = ((bbox.width().max(0) as u32) * f).min(src_w - x);
+                    let fh = ((bbox.height().max(0) as u32) * f).min(src_h - y);
                     FaceBox { x, y, w: fw, h: fh }
                 });
             detect_time += d0.elapsed().as_secs_f64();
@@ -388,8 +492,12 @@ fn main() -> Result<()> {
         }
 
         let a0 = Instant::now();
-        let res = analyzer.process_frame(&buf, PROC_W, PROC_H, last_face, t);
+        let res = analyzer.process_frame(&buf, src_w, src_h, last_face, t);
         analyze_time += a0.elapsed().as_secs_f64();
+
+        if args.dump_rois.is_some() {
+            roi_dump.record(&buf, src_w, src_h, last_face, frame_idx, t);
+        }
 
         times.push(t);
         faces.push(res.face_found);
@@ -398,10 +506,21 @@ fn main() -> Result<()> {
         bpm10.push(res.bpm_10s);
         bpm30.push(res.bpm_30s);
         bpm60.push(res.bpm_60s);
+        resp.push(res.resp_bpm);
+        qualities.push(res.quality);
 
         frame_idx += 1;
     }
     let _ = child.wait();
+    if let Some(path) = &args.dump_rois {
+        if let Some(dir) = std::path::Path::new(path).parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let mut out = RoiDump::header();
+        for r in &roi_dump.rows { out.push_str(r); }
+        std::fs::write(path, out)?;
+        println!("ROI dump written: {}", path);
+    }
     let total_wall = wall_start.elapsed().as_secs_f64();
     let n = times.len();
     if n < 100 {
@@ -451,25 +570,53 @@ fn main() -> Result<()> {
         }
     }
 
+    // Respiration reference from ROI luminance (breathing body motion).
+    let lum: Vec<f64> = rr.iter().zip(&gg).zip(&bb)
+        .map(|((r, g), b)| 0.299 * r + 0.587 * g + 0.114 * b)
+        .collect();
+    let resp_ref_hz = {
+        let (dfl, psdl) = welch_psd(&lum, fps, 40.0);
+        let lo = (0.13 / dfl).ceil() as usize;
+        let hi = ((0.55 / dfl).floor() as usize).min(psdl.len() - 1);
+        let mut peak = lo;
+        for i in lo..=hi {
+            if psdl[i] > psdl[peak] { peak = i; }
+        }
+        peak as f64 * dfl
+    };
+
     let pos = pos_overlap_add(&rr, &gg, &bb, fps);
     let pos_bp = bandpass_zero_phase(&pos, fps);
     let (df, psd) = welch_psd(&pos_bp, fps, 30.0);
     let peaks = band_peaks(df, &psd);
     if peaks.is_empty() { bail!("no spectral peaks in HR band — reference failed"); }
-    let (f0, p0) = peaks[0];
+    let pmax = peaks[0].1;
+
+    // Same evidence-based selection the engine uses: harmonic support bonus,
+    // breathing-harmonic penalty (no tracking prior offline).
+    let p_at = |f: f64| -> f64 {
+        let i = (f / df).round() as usize;
+        let a = i.saturating_sub(2);
+        let b = (i + 2).min(psd.len() - 1);
+        psd[a..=b].iter().cloned().fold(0.0, f64::max)
+    };
+    let mut scored: Vec<(f64, f64, f64)> = peaks.iter().map(|&(f, p)| {
+        let harmonic = if 2.0 * f <= BAND_HI + 0.5 { 0.35 * p_at(2.0 * f) / pmax } else { 0.0 };
+        let k = (f / resp_ref_hz).round();
+        let breath_penalty = if resp_ref_hz > 0.05 && k >= 2.0 && (f - k * resp_ref_hz).abs() < 0.05 { 0.5 } else { 1.0 };
+        ((p / pmax) * (1.0 + harmonic) * breath_penalty, f, p)
+    }).collect();
+    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    let (_, f0, p0) = scored[0];
     let ref_bpm = f0 * 60.0;
     let ref_snr = snr_db(df, &psd, f0);
 
-    println!("\n--- Reference (full-recording POS + Welch) ---");
+    println!("\n--- Reference (full-recording POS + Welch, harmonic-aware) ---");
     println!("  REFERENCE HR: {:.1} BPM  (f0={:.3} Hz)   SNR: {:+.2} dB", ref_bpm, f0, ref_snr);
-    println!("  top peaks:");
-    for (f, p) in peaks.iter().take(5) {
-        println!("    {:>6.1} BPM   rel power {:>5.3}", f * 60.0, p / p0);
-    }
-    if let Some((fh, ph)) = peaks.iter().find(|(f, _)| (f - f0 / 2.0).abs() < 0.08) {
-        if *ph > 0.35 * p0 {
-            println!("  WARNING: strong peak at {:.1} BPM (half of reference) — reference may be a 2nd harmonic", fh * 60.0);
-        }
+    println!("  REFERENCE RESP: {:.1} breaths/min", resp_ref_hz * 60.0);
+    println!("  top peaks (score | rel power):");
+    for (s, f, p) in scored.iter().take(5) {
+        println!("    {:>6.1} BPM   score {:>5.3}   rel {:>5.3}", f * 60.0, s, p / p0.max(1e-12));
     }
 
     // Production pulse-signal quality: bandpass the raw production pulse and
@@ -496,26 +643,33 @@ fn main() -> Result<()> {
     if let Some(dir) = std::path::Path::new(&csv_path).parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    let mut csv = String::from("frame,t,face,r,g,b,pulse,bpm10,bpm30,bpm60\n");
+    let mut csv = String::from("frame,t,face,r,g,b,pulse,bpm10,bpm30,bpm60,resp,quality\n");
     for i in 0..n {
         let (r, g, b) = rgb_trace[i].map(|(r, g, b)| (r, g, b)).unwrap_or((0.0, 0.0, 0.0));
         csv.push_str(&format!(
-            "{},{:.3},{},{:.2},{:.2},{:.2},{:.5},{},{},{}\n",
+            "{},{:.3},{},{:.2},{:.2},{:.2},{:.5},{},{},{},{},{:.1}\n",
             i, times[i], faces[i] as u8, r, g, b, pulses[i],
             bpm10[i].map(|v| format!("{:.2}", v)).unwrap_or_default(),
             bpm30[i].map(|v| format!("{:.2}", v)).unwrap_or_default(),
             bpm60[i].map(|v| format!("{:.2}", v)).unwrap_or_default(),
+            resp[i].map(|v| format!("{:.2}", v)).unwrap_or_default(),
+            qualities[i],
         ));
     }
     std::fs::write(&csv_path, csv)?;
     println!("\nCSV written: {}", csv_path);
 
+    let resp_vals: Vec<f64> = resp.iter().flatten().map(|v| *v as f64).collect();
+    let resp_mean = if resp_vals.is_empty() { 0.0 } else { resp_vals.iter().sum::<f64>() / resp_vals.len() as f64 };
+    println!("  production respiration: mean {:.1} breaths/min (ref {:.1}), coverage {:.1}%",
+        resp_mean, resp_ref_hz * 60.0, 100.0 * resp_vals.len() as f64 / n as f64);
+
     // Machine-readable one-liner for tracking across commits.
     println!(
-        "\nSUMMARY {} refBPM={:.1} refSNR={:+.2} prodSNR={:+.2} prodPeak={:.1} mae10={:.2} mae30={:.2} mae60={:.2} rmse10={:.2} within5_10={:.1} cov10={:.1} std10={:.2}",
+        "\nSUMMARY {} refBPM={:.1} refSNR={:+.2} prodSNR={:+.2} prodPeak={:.1} mae10={:.2} mae30={:.2} mae60={:.2} rmse10={:.2} within5_10={:.1} cov10={:.1} std10={:.2} resp={:.1} respRef={:.1}",
         args.label, ref_bpm, ref_snr, prod_snr, prod_peak,
         st10.mae, st30.mae, st60.mae, st10.rmse, st10.within5,
-        100.0 * st10.count as f64 / n as f64, st10.std
+        100.0 * st10.count as f64 / n as f64, st10.std, resp_mean, resp_ref_hz * 60.0
     );
 
     Ok(())
