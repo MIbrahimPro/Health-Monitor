@@ -6,7 +6,7 @@ Work top to bottom. Each step is self-contained.
 
 ---
 
-## Step 1 — Graceful start/stop lifecycle `[ ]`
+## Step 1 — Graceful start/stop lifecycle `[x]`
 
 **Goal:** The camera loop can be cleanly started AND stopped, and cannot be double-started. Today `start_tracking` spawns a thread that runs forever with no way to stop it or release the camera.
 

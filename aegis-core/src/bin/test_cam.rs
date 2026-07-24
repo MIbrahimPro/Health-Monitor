@@ -6,8 +6,10 @@ use std::time::Duration;
 async fn main() {
     let (tx, mut rx) = mpsc::channel(100);
 
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
     println!("Starting camera loop...");
-    start_camera_loop(tx).expect("Failed to start");
+    start_camera_loop(tx, Arc::new(AtomicBool::new(false))).expect("Failed to start");
 
     let timeout = tokio::time::sleep(Duration::from_secs(125));
     tokio::pin!(timeout);

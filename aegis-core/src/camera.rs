@@ -12,6 +12,7 @@ use std::fs::{create_dir_all, OpenOptions};
 use std::io::Cursor;
 use std::io::Write;
 use std::sync::{mpsc as std_mpsc, Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc;
 
@@ -54,7 +55,7 @@ pub fn find_face_model() -> Option<String> {
     None
 }
 
-pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
+pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>) -> Result<()> {
     std::thread::spawn(move || {
         let _ = create_dir_all("../logs");
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
@@ -152,6 +153,11 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
 
         log_msg!(log_file, "Entering main capture loop.");
         loop {
+            if stop.load(Ordering::Relaxed) {
+                log_msg!(log_file, "Stop requested.");
+                break;
+            }
+
             // --- 1. Capture frame ---
             let frame = match camera.frame() {
                 Ok(f) => f,
@@ -262,6 +268,10 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
 
             frame_counter += 1;
         }
+        
+        drop(detect_tx);
+        drop(camera);
+        log_msg!(log_file, "Camera released.");
     });
 
     Ok(())
