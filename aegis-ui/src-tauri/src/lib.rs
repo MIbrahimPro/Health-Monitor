@@ -1,5 +1,5 @@
 use aegis_core::camera::start_camera_loop;
-use aegis_core::context::{start_context_loop, get_context_summary as core_get_context_summary};
+use aegis_core::context::{start_context_loop, get_context_summary as core_get_context_summary, get_intent_now as core_get_intent_now, ContextSummary, Intent};
 use aegis_core::config::Config;
 use chrono::{Local, Timelike};
 use serde::Serialize;
@@ -174,8 +174,13 @@ fn overlay_set_warmth(app: AppHandle, warmth: f32) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn get_context_summary(hours: f64) -> Vec<(String, u64)> {
+fn get_context_summary(hours: f64) -> ContextSummary {
     core_get_context_summary(hours)
+}
+
+#[tauri::command]
+fn get_intent_now() -> Intent {
+    core_get_intent_now()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -239,7 +244,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             start_tracking, stop_tracking, get_config, set_config,
             overlay_enable, overlay_disable, overlay_set_warmth,
-            get_context_summary
+            get_context_summary, get_intent_now
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

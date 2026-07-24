@@ -4,6 +4,85 @@ use std::thread;
 use std::time::Duration;
 use rusqlite::{Connection, params};
 
+use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Intent {
+    DeepWork,
+    Research,
+    Distraction,
+    Idle,
+}
+
+impl Intent {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Intent::DeepWork => "DeepWork",
+            Intent::Research => "Research",
+            Intent::Distraction => "Distraction",
+            Intent::Idle => "Idle",
+        }
+    }
+    
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "DeepWork" => Intent::DeepWork,
+            "Research" => Intent::Research,
+            "Distraction" => Intent::Distraction,
+            _ => Intent::Idle,
+        }
+    }
+}
+
+pub fn classify(app: &str, title: &str) -> Intent {
+    let app = app.to_lowercase();
+    let title = title.to_lowercase();
+    
+    // Distraction
+    if app.contains("youtube") || title.contains("youtube") {
+        if !title.contains("tutorial") && !title.contains("course") && !title.contains("lecture") {
+            return Intent::Distraction;
+        }
+    }
+    if app.contains("reddit") || title.contains("reddit") {
+        if !title.contains("r/rust") && !title.contains("r/programming") {
+            return Intent::Distraction;
+        }
+    }
+    let distractions = ["netflix", "twitch", "tiktok", "instagram", "facebook", "twitter", "x.com", "steam", "game"];
+    for d in distractions {
+        if app.contains(d) || title.contains(d) {
+            return Intent::Distraction;
+        }
+    }
+    
+    // DeepWork
+    let deep_work = ["code", "vim", "nvim", "emacs", "intellij", "pycharm", "terminal", "konsole", "alacritty", "kitty", "blender", "figma", "davinci"];
+    for dw in deep_work {
+        if app.contains(dw) || title.contains(dw) {
+            return Intent::DeepWork;
+        }
+    }
+    
+    // Research
+    let research = ["stackoverflow", "github", "docs.", "documentation", "arxiv", "scholar", "wikipedia", "chatgpt", "claude"];
+    for r in research {
+        if app.contains(r) || title.contains(r) {
+            return Intent::Research;
+        }
+    }
+    
+    // Fallback
+    let browsers = ["firefox", "chrome", "chromium", "brave", "safari", "edge", "opera", "browser"];
+    for b in browsers {
+        if app.contains(b) {
+            return Intent::Research;
+        }
+    }
+    
+    Intent::DeepWork // Default fallback for unknown apps
+}
+
 pub fn active_window() -> Option<(String, String)> {
     let session = std::env::var("XDG_SESSION_TYPE").unwrap_or_default();
     if session == "wayland" {
@@ -77,24 +156,30 @@ pub fn start_context_loop(stop: Arc<AtomicBool>) {
             }
         };
 
-        let _ = conn.execute_batch(
-            "PRAGMA journal_mode = WAL;
-             CREATE TABLE IF NOT EXISTS samples (
-                 ts INTEGER NOT NULL,
-                 app TEXT NOT NULL,
-                 title TEXT NOT NULL
-             );"
-        );
+        let user_version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0)).unwrap_or(0);
+        if user_version == 0 {
+            let _ = conn.execute_batch(
+                "PRAGMA journal_mode = WAL;
+                 CREATE TABLE IF NOT EXISTS samples (
+                     ts INTEGER NOT NULL,
+                     app TEXT NOT NULL,
+                     title TEXT NOT NULL
+                 );
+                 ALTER TABLE samples ADD COLUMN intent TEXT NOT NULL DEFAULT 'DeepWork';
+                 PRAGMA user_version = 1;"
+            );
+        }
 
         while !stop.load(Ordering::Relaxed) {
             if let Some((app, title)) = active_window() {
+                let intent = classify(&app, &title);
                 let ts = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_secs() as i64;
                 let _ = conn.execute(
-                    "INSERT INTO samples (ts, app, title) VALUES (?1, ?2, ?3)",
-                    params![ts, app, title],
+                    "INSERT INTO samples (ts, app, title, intent) VALUES (?1, ?2, ?3, ?4)",
+                    params![ts, app, title, intent.as_str()],
                 );
             }
             thread::sleep(Duration::from_secs(5));
@@ -102,14 +187,25 @@ pub fn start_context_loop(stop: Arc<AtomicBool>) {
     });
 }
 
-pub fn get_context_summary(hours: f64) -> Vec<(String, u64)> {
+#[derive(Serialize)]
+pub struct ContextSummary {
+    pub top_apps: Vec<(String, u64)>,
+    pub intent_split: std::collections::HashMap<String, u64>, // intent -> seconds
+}
+
+pub fn get_context_summary(hours: f64) -> ContextSummary {
     let mut db_path = dirs::data_local_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
     db_path.push("aegis");
     db_path.push("context.db");
 
+    let mut empty_summary = ContextSummary {
+        top_apps: vec![],
+        intent_split: std::collections::HashMap::new(),
+    };
+
     let conn = match Connection::open(&db_path) {
         Ok(c) => c,
-        Err(_) => return vec![],
+        Err(_) => return empty_summary,
     };
 
     let ts_threshold = std::time::SystemTime::now()
@@ -117,22 +213,38 @@ pub fn get_context_summary(hours: f64) -> Vec<(String, u64)> {
         .unwrap_or_default()
         .as_secs() as i64 - (hours * 3600.0) as i64;
 
-    let mut stmt = match conn.prepare(
-        "SELECT app, count(*) * 5 as seconds FROM samples WHERE ts >= ?1 GROUP BY app ORDER BY seconds DESC"
-    ) {
-        Ok(s) => s,
-        Err(_) => return vec![],
-    };
+    // Top apps
+    if let Ok(mut stmt) = conn.prepare("SELECT app, count(*) * 5 as seconds FROM samples WHERE ts >= ?1 GROUP BY app ORDER BY seconds DESC") {
+        if let Ok(rows) = stmt.query_map(params![ts_threshold], |row| {
+            let app: String = row.get(0)?;
+            let seconds: i64 = row.get(1)?;
+            Ok((app, seconds as u64))
+        }) {
+            empty_summary.top_apps = rows.filter_map(Result::ok).collect();
+        }
+    }
+    
+    // Intent split
+    if let Ok(mut stmt) = conn.prepare("SELECT intent, count(*) * 5 as seconds FROM samples WHERE ts >= ?1 GROUP BY intent") {
+        if let Ok(rows) = stmt.query_map(params![ts_threshold], |row| {
+            let intent: String = row.get(0)?;
+            let seconds: i64 = row.get(1)?;
+            Ok((intent, seconds as u64))
+        }) {
+            for row in rows.filter_map(Result::ok) {
+                empty_summary.intent_split.insert(row.0, row.1);
+            }
+        }
+    }
 
-    let rows = stmt.query_map(params![ts_threshold], |row| {
-        let app: String = row.get(0)?;
-        let seconds: i64 = row.get(1)?;
-        Ok((app, seconds as u64))
-    });
+    empty_summary
+}
 
-    match rows {
-        Ok(iter) => iter.filter_map(Result::ok).collect(),
-        Err(_) => vec![],
+pub fn get_intent_now() -> Intent {
+    if let Some((app, title)) = active_window() {
+        classify(&app, &title)
+    } else {
+        Intent::Idle
     }
 }
 

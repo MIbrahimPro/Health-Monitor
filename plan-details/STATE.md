@@ -87,3 +87,4 @@ Regression rule: `std10 ≤ 5`, `maxJump10 ≤ 2`, `cov10 ≥ 90 %`, 5/5 synthet
 - 2026-07-24: UI Phase 1 Step 6 - Polish pass: entrance stagger, skeletons, reduced-motion, window chrome
 - 2026-07-24: Phase 2 Step 1 - Comfort overlay window with click-through, warmth filter, and auto-scheduler
 - 2026-07-24: Phase 2 Step 2 - Context tracker: X11 active-window sampling into SQLite with summaries
+- 2026-07-24: Phase 2 Step 3 - Intent classification engine and SQLite migration
