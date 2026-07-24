@@ -1,2 +1,3 @@
-pub mod rppg;
 pub mod camera;
+pub mod pipeline;
+pub mod rppg;

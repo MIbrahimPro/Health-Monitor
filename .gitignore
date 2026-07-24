@@ -21,3 +21,11 @@ output-data-*/
 # Misc
 .DS_Store
 misc/
+
+# Runtime logs
+logs/
+aegis-ui/logs/
+
+# Test media (privacy: contains the user's face) and benchmark results
+tests/*.avi
+tests/results/

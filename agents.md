@@ -44,8 +44,35 @@ PASS: Pipeline is working!
 
 ### Architecture
 ```
-aegis-core/src/camera.rs  → Camera capture + face detection + rPPG + frame encoding
-aegis-core/src/rppg.rs    → POS algorithm + FFT-based BPM calculation
+aegis-core/src/camera.rs  → Camera capture (YUYV) + multithreaded rustface detection + POS rPPG + skin masking + frame encoding
+aegis-core/src/rppg.rs    → POS algorithm (CHROM projection `3R-2G`) + IIR Detrending + Zero-padded FFT-based BPM calculation
 aegis-ui/src-tauri/src/lib.rs → Tauri commands, mpsc channel, event emitter
-aegis-ui/src/App.tsx      → React frontend with oscilloscope canvas + camera feed
+aegis-ui/src/App.tsx      → React frontend with oscilloscope canvas, 3 BPM averages, and camera feed
+scripts/                  → Directory for temporary utility scripts (e.g., test video recording)
 ```
+
+---
+
+### Session: Later on 2026-07-24
+
+#### Bug #4: Subharmonic Heart Rate Locking (Reads 40-50 instead of 80+) (RESOLVED)
+- **Symptom:** The BPM was constantly reading half of the true value.
+- **Root Cause:** POS algorithm was suffering from "alpha flutter" due to sliding window modulation. Also, the moving average detrending acted as a notch filter killing 1Hz (60 BPM). Lastly, non-uniform camera sampling corrupted FFT bins.
+- **Fix:** 
+  1. Time-domain interpolation to exactly 15 FPS.
+  2. Zero-padded FFT to 2048 points for extreme sub-BPM resolution.
+  3. Replaced moving average with a robust 1st-order IIR High-Pass filter (cutoff 0.5Hz).
+  4. Bypassed POS alpha calculation, defaulting to pure CHROM projection (`3R - 2G`) which doesn't flutter.
+
+#### Bug #5: Motion Artifacts & Dark Environment Failure (RESOLVED)
+- **Symptom:** Bounding box jitter caused massive BPM drops. Shadowed environments failed completely due to noise.
+- **Root Cause:** The `rustface` detection box snapped aggressively and sometimes included hair/background. In dark rooms, sensor noise overwhelmed the `3R - 2G` projection.
+- **Fix:** 
+  1. Applied an **Exponential Moving Average (EMA)** to the face bounding box so it glides smoothly.
+  2. Expanded the ROI from the top 30% to the top 60% of the bounding box (covering cheeks and nose, avoiding beard).
+  3. Implemented a **Kovac Skin Mask** that iterates through every pixel in the ROI and mathematically deletes non-skin pixels (pure black hair, white/yellow walls, etc.) based on `R > G` and `R > B` with dynamic thresholds. This completely insulates the mean RGB calculation from background noise.
+
+#### Feature: Dynamic Dashboard
+- Upgraded the React UI to display three synchronized BPM moving averages (10s, 30s, and 60s) side-by-side for accuracy comparison.
+- Added a hospital-style real-time oscilloscope waveform canvas.
+- Added a `scripts/` directory for holding temporary utilities (e.g. `record_test_video.py`).
