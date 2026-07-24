@@ -9,3 +9,5 @@ pub mod emotion;
 pub mod music;
 pub mod facerec;
 pub mod biometrics;
+pub mod sonar;
+pub mod csi;
