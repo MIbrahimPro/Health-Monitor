@@ -68,7 +68,7 @@ Rules: backgrounds only from `--bg-*`; never pure #000/#fff; text only the three
 **If it fails:** fontsource import path errors → check exact package export names in `node_modules/@fontsource/inter/`.
 **Commit:** `UI foundation: design tokens, local Inter/JetBrains Mono, 12-col dashboard shell`
 
-## Step 2 — Hero heart-rate card `[ ]`
+## Step 2 — Hero heart-rate card `[x]`
 
 **Instructions:**
 1. Component `HeroCard`: giant animated BPM (10 s tracker as primary), heartbeat ♥ SVG beating at the real rate, label "HEART RATE", sub-row showing 30 s and 60 s values as small mono chips ("30s · 72", "60s · 71").

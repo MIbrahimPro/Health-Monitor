@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { HeroCard } from "./components/HeroCard";
 import "./App.css";
 
 function App() {
@@ -13,10 +14,8 @@ function App() {
   const [fps, setFps] = useState<number>(0);
   const [warmupProgress, setWarmupProgress] = useState<number>(0);
   
-  // suppress TS unused errors for variables we will use fully in steps 2-6
-  void faceFound;
+  // suppress TS unused errors for variables we will use fully in steps 3-6
   void fps;
-  void warmupProgress;
   
   const pulseHistoryRef = useRef<number[]>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -153,15 +152,13 @@ function App() {
       </div>
 
       <div className="main-grid">
-        <div className="card hero-card">
-          <h2 className="card-title">Heart Rate</h2>
-          <div className="card-value" style={{ color: bpm10 ? 'var(--accent)' : 'var(--text-low)' }}>
-            {bpm10 !== null ? bpm10 : "--"}
-          </div>
-          <div className="card-subtext">
-            30s · {bpm30 ?? "--"} &nbsp; 60s · {bpm60 ?? "--"}
-          </div>
-        </div>
+        <HeroCard 
+          bpm10={bpm10} 
+          bpm30={bpm30} 
+          bpm60={bpm60} 
+          faceFound={faceFound} 
+          warmupProgress={warmupProgress} 
+        />
 
         <div className="card resp-card">
           <h2 className="card-title">Respiration</h2>
