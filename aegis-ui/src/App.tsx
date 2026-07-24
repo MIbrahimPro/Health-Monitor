@@ -118,11 +118,15 @@ function App() {
           </span>
         </div>
         <div className="header-controls">
+          {status.includes("Error") && (
+            <div className="error-toast">{status}</div>
+          )}
           <button 
-            className={!isTracking ? "primary" : ""} 
+            className={`action-btn ${!isTracking ? "primary" : "stop"}`} 
             onClick={isTracking ? stopTracking : startTracking}
+            disabled={status === "Starting..."}
           >
-            {isTracking ? "Stop" : "Start Monitoring"}
+            {status === "Starting..." ? "Starting..." : isTracking ? "Stop Monitoring" : "Start Monitoring"}
           </button>
         </div>
       </div>
@@ -144,10 +148,29 @@ function App() {
 
         <div className="card camera-card">
           <h2 className="card-title">Camera Feed</h2>
+          
+          <div className="camera-status-chip">
+            {isTracking ? (
+              faceFound ? (
+                <span className="chip-live"><span className="dot"></span>LIVE</span>
+              ) : (
+                <span className="chip-noface"><span className="dot"></span>NO FACE</span>
+              )
+            ) : (
+              <span className="chip-off"><span className="dot"></span>OFF</span>
+            )}
+          </div>
+
+          {!faceFound && isTracking && (
+            <div className="camera-overlay">
+              <div className="overlay-pill">Position your face in view</div>
+            </div>
+          )}
+
           {frameBase64 ? (
             <img src={`data:image/jpeg;base64,${frameBase64}`} className="camera-feed" />
           ) : (
-            <div style={{ padding: '40px', color: 'var(--text-low)', textAlign: 'center', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="camera-empty">
               No Signal
             </div>
           )}

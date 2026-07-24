@@ -100,7 +100,7 @@ Rules: backgrounds only from `--bg-*`; never pure #000/#fff; text only the three
 **If it fails:** canvas blurry → dpr scaling missing; jank → you're re-allocating gradients per frame, hoist them.
 **Commit:** `Cinematic waveform: rAF renderer, HiDPI, gradient stroke with comet head`
 
-## Step 5 — Camera card + status states `[ ]`
+## Step 5 — Camera card + status states `[x]`
 
 **Instructions:**
 1. Camera card: the JPEG feed with `border-radius: 10px`, over it a top-right status chip: `● LIVE` (accent) / `NO FACE` (danger) / `OFF` (text-low). When `!face_found`, overlay a centered pill "Position your face in view" with slight backdrop blur (`backdrop-filter: blur(4px)`).

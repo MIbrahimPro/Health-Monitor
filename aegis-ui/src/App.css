@@ -177,3 +177,108 @@ body {
   color: var(--text-mid);
   margin-top: auto;
 }
+
+/* Header Controls */
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.error-toast {
+  background: rgba(240, 84, 108, 0.1);
+  color: var(--danger);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid rgba(240, 84, 108, 0.2);
+}
+
+.action-btn.stop {
+  background: transparent;
+  border: 1px solid var(--stroke-strong);
+}
+
+.action-btn.stop:hover {
+  background: rgba(240, 84, 108, 0.1);
+  color: var(--danger);
+  border-color: rgba(240, 84, 108, 0.3);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Camera Card States */
+.camera-status-chip {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.camera-status-chip span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.camera-status-chip .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.chip-live { color: var(--accent); }
+.chip-live .dot { background: var(--accent); }
+
+.chip-noface { color: var(--danger); }
+.chip-noface .dot { background: var(--danger); }
+
+.chip-off { color: var(--text-low); }
+.chip-off .dot { background: var(--text-low); }
+
+.camera-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.overlay-pill {
+  background: rgba(12, 17, 26, 0.8);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-hi);
+  border: 1px solid var(--stroke);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.camera-empty {
+  padding: 40px;
+  color: var(--text-low);
+  text-align: center;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

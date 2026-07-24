@@ -82,3 +82,4 @@ Regression rule: `std10 ≤ 5`, `maxJump10 ≤ 2`, `cov10 ≥ 90 %`, 5/5 synthet
 - 2026-07-24: UI Phase 1 Step 2 - Hero heart-rate card with animated numbers, heartbeat SVG, shimmer
 - 2026-07-24: UI Phase 1 Step 3 - Respiration and signal-quality cards with animated ring and live SNR
 - 2026-07-24: UI Phase 1 Step 4 - Cinematic waveform: rAF renderer, HiDPI, gradient stroke with comet head
+- 2026-07-24: UI Phase 1 Step 5 - Camera card status system, start/stop control states, remove inline styles
