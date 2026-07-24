@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { HeroCard } from "./components/HeroCard";
+import { RespCard } from "./components/RespCard";
+import { QualityCard } from "./components/QualityCard";
 import "./App.css";
 
 function App() {
@@ -13,9 +15,9 @@ function App() {
   const [status, setStatus] = useState<string>("Stopped");
   const [fps, setFps] = useState<number>(0);
   const [warmupProgress, setWarmupProgress] = useState<number>(0);
-  
-  // suppress TS unused errors for variables we will use fully in steps 3-6
-  void fps;
+  const [respBpm, setRespBpm] = useState<number | null>(null);
+  const [quality, setQuality] = useState<number>(0);
+  const [snrDb, setSnrDb] = useState<number>(0);
   
   const pulseHistoryRef = useRef<number[]>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -33,12 +35,18 @@ function App() {
       face_found: boolean;
       frame_base64: string | null;
       fps: number;
+      resp_bpm: number | null;
+      quality: number;
+      snr_db: number;
     }>("pulse-update", (event) => {
       const p = event.payload;
 
       setFaceFound(p.face_found);
       if (p.fps > 0) setFps(p.fps);
       if (p.frame_base64) setFrameBase64(p.frame_base64);
+      setRespBpm(p.resp_bpm);
+      setQuality(p.quality);
+      setSnrDb(p.snr_db);
 
       frameCountRef.current += 1;
       if (p.face_found) {
@@ -160,15 +168,9 @@ function App() {
           warmupProgress={warmupProgress} 
         />
 
-        <div className="card resp-card">
-          <h2 className="card-title">Respiration</h2>
-          <div className="card-value" style={{ color: 'var(--accent-warm)' }}>--</div>
-        </div>
+        <RespCard respBpm={respBpm} />
 
-        <div className="card quality-card">
-          <h2 className="card-title">Signal Quality</h2>
-          <div className="card-value">--</div>
-        </div>
+        <QualityCard quality={quality} snrDb={snrDb} fps={fps} />
 
         <div className="card waveform-card">
           <h2 className="card-title">rPPG Waveform</h2>

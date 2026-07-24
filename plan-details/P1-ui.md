@@ -78,7 +78,7 @@ Rules: backgrounds only from `--bg-*`; never pure #000/#fff; text only the three
 **Verify:** dev run — number glides between values (no hard jumps), heart beats at displayed rate, calibration shimmer before first lock.
 **Commit:** `Hero heart-rate card: animated value, live heartbeat, calibration shimmer`
 
-## Step 3 — Respiration + signal quality cards `[ ]`
+## Step 3 — Respiration + signal quality cards `[x]`
 
 **Instructions:**
 1. `RespCard`: animated breaths/min from `resp_bpm` (amber accent), tiny sine-wave SVG that undulates at the respiration rate (CSS `animation-duration = 60/resp` s), `--` state when null.

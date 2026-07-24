@@ -1,0 +1,45 @@
+.resp-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.resp-unit {
+  font-size: 11px;
+  color: var(--text-mid);
+  margin-top: 4px;
+}
+
+.resp-wave-container {
+  margin-top: auto;
+  height: 40px;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  opacity: 0.8;
+}
+
+.resp-wave {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 100%;
+}
+
+.resp-wave.undulating {
+  animation: waveTranslate linear infinite;
+}
+
+@keyframes waveTranslate {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resp-wave.undulating {
+    animation: none;
+  }
+}
