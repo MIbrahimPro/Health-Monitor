@@ -262,8 +262,19 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>) -> Result<()> {
                             fallback_b += b;
                             fallback_c += 1.0;
 
-                            // Skin Mask: Human skin reflects more Red than Green/Blue in ANY lighting
-                            if r > g && r > b {
+                            // Advanced Skin Mask (Kovac et al. modified for low light):
+                            // 1. R > G > B (Human skin reflects more red)
+                            // 2. Reject pure black hair / dark shadows (R > 40, G > 20)
+                            // 3. Ensure color isn't purely grayscale background (max - min > 10)
+                            // 4. Ensure it's not a yellow/white wall (abs(R - G) > 10)
+                            let max_val = r.max(g).max(b);
+                            let min_val = r.min(g).min(b);
+                            
+                            if r > g && r > b 
+                               && r > 40.0 && g > 20.0 
+                               && (max_val - min_val) > 10.0 
+                               && (r - g).abs() > 10.0 
+                            {
                                 sum_r += r;
                                 sum_g += g;
                                 sum_b += b;
