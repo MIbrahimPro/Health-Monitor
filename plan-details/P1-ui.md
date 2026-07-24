@@ -48,7 +48,7 @@ Rules: backgrounds only from `--bg-*`; never pure #000/#fff; text only the three
 
 ---
 
-## Step 1 — Foundation: tokens, fonts, layout shell `[ ]`
+## Step 1 — Foundation: tokens, fonts, layout shell `[x]`
 
 **Instructions:**
 1. `npm i @fontsource/inter @fontsource/jetbrains-mono` in `aegis-ui/`.

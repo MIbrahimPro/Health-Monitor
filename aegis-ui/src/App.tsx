@@ -12,6 +12,12 @@ function App() {
   const [status, setStatus] = useState<string>("Stopped");
   const [fps, setFps] = useState<number>(0);
   const [warmupProgress, setWarmupProgress] = useState<number>(0);
+  
+  // suppress TS unused errors for variables we will use fully in steps 2-6
+  void faceFound;
+  void fps;
+  void warmupProgress;
+  
   const pulseHistoryRef = useRef<number[]>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const smoothedBpm10Ref = useRef<number | null>(null);
@@ -33,18 +39,13 @@ function App() {
 
       setFaceFound(p.face_found);
       if (p.fps > 0) setFps(p.fps);
+      if (p.frame_base64) setFrameBase64(p.frame_base64);
 
-      if (p.frame_base64) {
-        setFrameBase64(p.frame_base64);
-      }
-
-      // Track warmup progress
       frameCountRef.current += 1;
       if (p.face_found) {
         setWarmupProgress(Math.min(100, (frameCountRef.current / 45) * 100));
       }
 
-      // Smooth BPM displays
       const smoothBpm = (val: number | null, ref: React.MutableRefObject<number | null>, setter: React.Dispatch<React.SetStateAction<number | null>>) => {
         if (val !== null && val >= 40 && val <= 180) {
           if (ref.current === null) {
@@ -60,7 +61,6 @@ function App() {
       smoothBpm(p.bpm_30s, smoothedBpm30Ref, setBpm30);
       smoothBpm(p.bpm_60s, smoothedBpm60Ref, setBpm60);
 
-      // Pulse history for oscilloscope
       pulseHistoryRef.current.push(p.pulse);
       if (pulseHistoryRef.current.length > 300) {
         pulseHistoryRef.current.shift();
@@ -83,57 +83,25 @@ function App() {
     if (data.length < 2) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Grid
-    ctx.strokeStyle = "rgba(0, 255, 0, 0.08)";
-    ctx.lineWidth = 1;
+    
+    // Draw simple line for now, will be rewritten in Step 4
     ctx.beginPath();
-    for (let i = 0; i < canvas.height; i += 30) {
-      ctx.moveTo(0, i);
-      ctx.lineTo(canvas.width, i);
-    }
-    for (let i = 0; i < canvas.width; i += 30) {
-      ctx.moveTo(i, 0);
-      ctx.lineTo(i, canvas.height);
-    }
-    ctx.stroke();
-
-    // Center line
-    ctx.strokeStyle = "rgba(0, 255, 0, 0.15)";
-    ctx.beginPath();
-    ctx.moveTo(0, canvas.height / 2);
-    ctx.lineTo(canvas.width, canvas.height / 2);
-    ctx.stroke();
-
-    // ECG line
-    ctx.beginPath();
-    ctx.strokeStyle = "#00ff00";
+    ctx.strokeStyle = "#2DE0A5";
     ctx.lineWidth = 2;
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-
+    
     const maxVal = Math.max(...data, 0.001);
     const minVal = Math.min(...data, -0.001);
     const range = Math.max(maxVal - minVal, 0.001);
-
-    const stepX = canvas.width / 300;
+    const stepX = canvas.width / Math.max(1, data.length - 1);
 
     for (let i = 0; i < data.length; i++) {
       const x = i * stepX;
       const normalized = (data[i] - minVal) / range;
       const y = canvas.height - (normalized * canvas.height * 0.8 + canvas.height * 0.1);
-
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     }
-
-    ctx.shadowBlur = 8;
-    ctx.shadowColor = "#00ff00";
     ctx.stroke();
-    ctx.shadowBlur = 0;
   };
 
   async function startTracking() {
@@ -142,6 +110,9 @@ function App() {
     smoothedBpm10Ref.current = null;
     smoothedBpm30Ref.current = null;
     smoothedBpm60Ref.current = null;
+    setBpm10(null);
+    setBpm30(null);
+    setBpm60(null);
     setWarmupProgress(0);
     try {
       const response = await invoke<string>("start_tracking");
@@ -151,109 +122,79 @@ function App() {
     }
   }
 
+  async function stopTracking() {
+    try {
+      const response = await invoke<string>("stop_tracking");
+      setStatus(response);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   const isTracking = status.includes("Tracking");
-  
-  const getBpmColor = (val: number | null) => {
-    return val !== null ? (val < 60 ? "#00aaff" : val > 100 ? "#ff4444" : "#00ff00") : "#666";
-  };
 
   return (
-    <main className="aegis-app">
-      {/* Header */}
-      <div className="header">
+    <div className="app-container">
+      <div className="app-header">
         <div className="header-left">
-          <h1 className="title">Aegis Vital Monitor</h1>
-          <div className="status-row">
-            <span className={`status-dot ${isTracking ? "active" : ""}`} />
-            <span className={`status-text ${isTracking ? "active" : ""}`}>{status}</span>
-            {isTracking && fps > 0 && (
-              <span className="fps-badge">{fps.toFixed(0)} FPS</span>
-            )}
-          </div>
+          <span className="logo-mark">AEGIS</span>
+          <span className={`status-chip ${isTracking ? 'running' : 'idle'}`}>
+            {status}
+          </span>
         </div>
-        <button className="init-btn" onClick={startTracking}>
-          Initialize Sensors
-        </button>
+        <div className="header-controls">
+          <button 
+            className={!isTracking ? "primary" : ""} 
+            onClick={isTracking ? stopTracking : startTracking}
+          >
+            {isTracking ? "Stop" : "Start Monitoring"}
+          </button>
+        </div>
       </div>
 
-      {/* Main Content */}
-      <div className="content">
-        {/* Left: BPM + Waveform */}
-        <div className="panel left-panel">
-          {/* BPM Displays */}
-          <div className="bpm-container" style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-            <div className="bpm-section">
-              <div className="bpm-value" style={{ color: getBpmColor(bpm10) }}>
-                {bpm10 !== null ? bpm10 : "--"}
-              </div>
-              <div className="bpm-label">BPM (10s avg)</div>
-            </div>
-            
-            <div className="bpm-section">
-              <div className="bpm-value" style={{ color: getBpmColor(bpm30), fontSize: '2.5rem' }}>
-                {bpm30 !== null ? bpm30 : "--"}
-              </div>
-              <div className="bpm-label" style={{ fontSize: '0.9rem' }}>BPM (30s avg)</div>
-            </div>
-            
-            <div className="bpm-section">
-              <div className="bpm-value" style={{ color: getBpmColor(bpm60), fontSize: '2.5rem' }}>
-                {bpm60 !== null ? bpm60 : "--"}
-              </div>
-              <div className="bpm-label" style={{ fontSize: '0.9rem' }}>BPM (60s avg)</div>
-            </div>
+      <div className="main-grid">
+        <div className="card hero-card">
+          <h2 className="card-title">Heart Rate</h2>
+          <div className="card-value" style={{ color: bpm10 ? 'var(--accent)' : 'var(--text-low)' }}>
+            {bpm10 !== null ? bpm10 : "--"}
           </div>
-          
-          {bpm10 === null && faceFound && warmupProgress < 100 && (
-            <div className="warmup-bar">
-              <div className="warmup-fill" style={{ width: `${warmupProgress}%` }} />
-              <span className="warmup-text">Calibrating...</span>
+          <div className="card-subtext">
+            30s · {bpm30 ?? "--"} &nbsp; 60s · {bpm60 ?? "--"}
+          </div>
+        </div>
+
+        <div className="card resp-card">
+          <h2 className="card-title">Respiration</h2>
+          <div className="card-value" style={{ color: 'var(--accent-warm)' }}>--</div>
+        </div>
+
+        <div className="card quality-card">
+          <h2 className="card-title">Signal Quality</h2>
+          <div className="card-value">--</div>
+        </div>
+
+        <div className="card waveform-card">
+          <h2 className="card-title">rPPG Waveform</h2>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <canvas 
+              ref={canvasRef} 
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} 
+            />
+          </div>
+        </div>
+
+        <div className="card camera-card">
+          <h2 className="card-title">Camera Feed</h2>
+          {frameBase64 ? (
+            <img src={`data:image/jpeg;base64,${frameBase64}`} className="camera-feed" />
+          ) : (
+            <div style={{ padding: '40px', color: 'var(--text-low)', textAlign: 'center', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              No Signal
             </div>
           )}
-
-          {/* Oscilloscope */}
-          <div className="oscilloscope-section" style={{ marginTop: '1rem' }}>
-            <span className="section-label">rPPG Waveform</span>
-            <div className="oscilloscope-container">
-              <canvas
-                ref={canvasRef}
-                width={900}
-                height={200}
-                className="oscilloscope-canvas"
-              />
-            </div>
-          </div>
-
-          <p className="status-hint">
-            {!isTracking
-              ? 'Click "Initialize Sensors" to begin.'
-              : faceFound
-              ? bpm10 !== null
-                ? "Pulse locked. Monitoring vitals."
-                : "Face detected. Calibrating pulse signal..."
-              : "No face detected. Please look at the camera."}
-          </p>
-        </div>
-
-        {/* Right: Camera Feed */}
-        <div className="panel right-panel">
-          <span className="section-label">Camera Feed</span>
-          <div className="camera-container">
-            {frameBase64 ? (
-              <img
-                src={`data:image/jpeg;base64,${frameBase64}`}
-                alt="Live Camera Feed"
-                className="camera-feed"
-              />
-            ) : (
-              <div className="no-signal">
-                <span>No Signal</span>
-              </div>
-            )}
-          </div>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 
