@@ -75,3 +75,4 @@ Regression rule: `std10 ≤ 5`, `maxJump10 ≤ 2`, `cov10 ≥ 90 %`, 5/5 synthet
 - 2026-07-24: Execution playbook written (P1–P6 step files) + support manuals (CONCEPTS, TESTING, EXPERIMENTS, TROUBLESHOOTING); per user direction, all remaining work is executed FROM these docs
 - 2026-07-24: Add graceful start/stop lifecycle with camera release and double-start guard
 - 2026-07-24: Optimize live hot loop: reuse gray/downscale/preview buffers (zero steady-state alloc)
+- 2026-07-24: Add JSON settings persistence with module toggles and safe defaults

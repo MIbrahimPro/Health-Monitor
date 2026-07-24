@@ -1,4 +1,5 @@
 use aegis_core::camera::start_camera_loop;
+use aegis_core::config::Config;
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -26,6 +27,11 @@ struct PulsePayload {
 
 #[tauri::command]
 fn start_tracking(app: AppHandle, state: State<'_, AppState>) -> String {
+    let cfg = Config::load();
+    if !cfg.camera_module {
+        return "Camera module is disabled in settings".into();
+    }
+
     if state.running.load(Ordering::Relaxed) {
         return "Tracking".into();
     }
@@ -73,6 +79,19 @@ fn stop_tracking(state: State<'_, AppState>) -> String {
     "Stopped".into()
 }
 
+#[tauri::command]
+fn get_config() -> Config {
+    Config::load()
+}
+
+#[tauri::command]
+fn set_config(cfg: Config) -> String {
+    match cfg.save() {
+        Ok(_) => "Config saved".into(),
+        Err(e) => format!("Failed to save config: {:?}", e),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -81,7 +100,7 @@ pub fn run() {
             running: Arc::new(AtomicBool::new(false)),
             stop_flag: Mutex::new(None),
         })
-        .invoke_handler(tauri::generate_handler![start_tracking, stop_tracking])
+        .invoke_handler(tauri::generate_handler![start_tracking, stop_tracking, get_config, set_config])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

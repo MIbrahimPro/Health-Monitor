@@ -84,7 +84,7 @@ Compare `perf_after` SUMMARY to `perf_before`: `std10`, `cov10`, `resp` must be 
 
 ---
 
-## Step 3 — Settings persistence (JSON config) `[ ]`
+## Step 3 — Settings persistence (JSON config) `[x]`
 
 **Goal:** Per `plan.md` 1.1: store module toggles + preferences in a local JSON config file, loaded on start, written on change.
 
