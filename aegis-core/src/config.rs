@@ -12,6 +12,7 @@ pub struct Config {
     pub context_module: bool,
     pub posture_module: bool,
     pub posture_enforce: bool,
+    pub emotion_module: bool,
 }
 
 impl Default for Config {
@@ -23,6 +24,7 @@ impl Default for Config {
             context_module: false,
             posture_module: true,
             posture_enforce: false,
+            emotion_module: false,
         }
     }
 }

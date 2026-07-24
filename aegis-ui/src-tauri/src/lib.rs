@@ -31,6 +31,7 @@ struct PulsePayload {
     pub frame_base64: Option<String>,
     pub fps: f32,
     pub posture: String,
+    pub emotion: Option<String>,
 }
 
 #[tauri::command]
@@ -78,6 +79,7 @@ fn start_tracking(app: AppHandle, state: State<'_, AppState>) -> String {
                     frame_base64: stats.frame_base64,
                     fps: stats.fps,
                     posture: stats.posture,
+                    emotion: stats.emotion,
                 },
             );
         }
