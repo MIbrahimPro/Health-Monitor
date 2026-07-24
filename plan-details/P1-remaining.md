@@ -126,7 +126,7 @@ Add a test in `aegis-core/tests/config.rs` that saves a non-default config to a 
 
 ---
 
-## Step 4 — System tray `[ ]`
+## Step 4 — System tray `[x]`
 
 **Goal:** Per `plan.md` 1.1 / `phase1_plan.md` 2.1: app lives in the system tray; clicking the tray icon shows/hides the window; a menu offers Show / Hide / Quit.
 
