@@ -11,6 +11,7 @@ pub struct Config {
     pub overlay_module: bool,
     pub context_module: bool,
     pub posture_module: bool,
+    pub posture_enforce: bool,
 }
 
 impl Default for Config {
@@ -21,6 +22,7 @@ impl Default for Config {
             overlay_module: false,
             context_module: false,
             posture_module: true,
+            posture_enforce: false,
         }
     }
 }

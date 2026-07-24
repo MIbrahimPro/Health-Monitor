@@ -28,9 +28,18 @@
       background-size: 280px;
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
     }
+    #frost {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      background: radial-gradient(circle, rgba(255,255,255,0.2) 40%, rgba(0,0,0,0.6) 100%);
+      opacity: 0;
+      transition: opacity 0.5s ease-in-out;
+    }
   </style>
 </head>
 <body>
+  <div id="frost"></div>
   <div id="tint"></div>
   <div id="grain"></div>
   <script>
@@ -39,6 +48,16 @@
       // Clamp between 0.0 and 0.6
       const safeWarmth = Math.max(0.0, Math.min(0.6, parseFloat(warmth) || 0));
       document.getElementById('tint').style.backgroundColor = `rgba(255, 147, 41, ${safeWarmth})`;
+    }
+    
+    function setFrost(level) {
+      const safeLevel = Math.max(0.0, Math.min(1.0, parseFloat(level) || 0));
+      const frost = document.getElementById('frost');
+      const grain = document.getElementById('grain');
+      
+      frost.style.opacity = safeLevel;
+      // Increase grain intensity with frost
+      grain.style.opacity = 0.05 + (safeLevel * 0.15);
     }
   </script>
 </body>

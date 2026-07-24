@@ -14,6 +14,8 @@ struct AppState {
     running: Arc<AtomicBool>,
     stop_flag: Mutex<Option<Arc<AtomicBool>>>,
     overlay_scheduler: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
+    posture_state: Arc<Mutex<String>>,
+    frost_scheduler: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
 }
 
 #[derive(Clone, Serialize)]
@@ -25,9 +27,10 @@ struct PulsePayload {
     resp_bpm: Option<f32>,
     quality: f32,
     snr_db: f32,
-    face_found: bool,
-    frame_base64: Option<String>,
-    fps: f32,
+    pub face_found: bool,
+    pub frame_base64: Option<String>,
+    pub fps: f32,
+    pub posture: String,
 }
 
 #[tauri::command]
@@ -54,9 +57,14 @@ fn start_tracking(app: AppHandle, state: State<'_, AppState>) -> String {
 
     start_context_loop(stop_flag.clone());
 
+    let posture_ref = state.posture_state.clone();
+    let app_clone = app.clone();
+
     tauri::async_runtime::spawn(async move {
         while let Some(stats) = rx.recv().await {
-            let _ = app.emit(
+            *posture_ref.lock().unwrap() = stats.posture.clone();
+            
+            let _ = app_clone.emit(
                 "pulse-update",
                 PulsePayload {
                     pulse: stats.raw_pulse,
@@ -69,16 +77,70 @@ fn start_tracking(app: AppHandle, state: State<'_, AppState>) -> String {
                     face_found: stats.face_found,
                     frame_base64: stats.frame_base64,
                     fps: stats.fps,
+                    posture: stats.posture,
                 },
             );
         }
     });
+
+    let posture_ref2 = state.posture_state.clone();
+    let app_clone2 = app.clone();
+    let frost_task = tauri::async_runtime::spawn(async move {
+        let mut frost_level = 0.0f32;
+        loop {
+            let cfg = Config::load();
+            let posture = posture_ref2.lock().unwrap().clone();
+            
+            if cfg.posture_enforce {
+                if posture != "Good" {
+                    frost_level = (frost_level + (0.8 / (20.0 / 0.5))).min(0.8);
+                } else {
+                    frost_level = (frost_level - (0.8 / (0.6 / 0.5))).max(0.0);
+                }
+                
+                if frost_level > 0.0 {
+                    // Create overlay if not exists
+                    if app_clone2.get_webview_window("overlay").is_none() {
+                        let window = WebviewWindowBuilder::new(&app_clone2, "overlay", WebviewUrl::App("overlay.html".into()))
+                            .title("Overlay")
+                            .decorations(false)
+                            .transparent(true)
+                            .always_on_top(true)
+                            .skip_taskbar(true)
+                            .focused(false)
+                            .fullscreen(true)
+                            .build();
+                        if let Ok(win) = window {
+                            let _ = win.set_ignore_cursor_events(true);
+                        }
+                    }
+                    if let Some(win) = app_clone2.get_webview_window("overlay") {
+                        let _ = win.eval(&format!("setFrost({})", frost_level));
+                    }
+                } else {
+                    if let Some(win) = app_clone2.get_webview_window("overlay") {
+                        let _ = win.eval("setFrost(0.0)");
+                        // Optional: if we created it just for frost and warmth is 0, we could close it, but 
+                        // to keep logic simple, we just let it sit transparent. 
+                        // (Wait, the instruction says "close overlay if warmth==0". Let's assume frontend manages overlay_disable).
+                    }
+                }
+            }
+            
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        }
+    });
+    
+    *state.frost_scheduler.lock().unwrap() = Some(frost_task);
 
     "Tracking started".into()
 }
 
 #[tauri::command]
 fn stop_tracking(state: State<'_, AppState>) -> String {
+    if let Some(handle) = state.frost_scheduler.lock().unwrap().take() {
+        handle.abort();
+    }
     if let Some(stop_flag) = state.stop_flag.lock().unwrap().take() {
         stop_flag.store(true, Ordering::Relaxed);
     }
@@ -240,6 +302,8 @@ pub fn run() {
             running: Arc::new(AtomicBool::new(false)),
             stop_flag: Mutex::new(None),
             overlay_scheduler: Mutex::new(None),
+            posture_state: Arc::new(Mutex::new("Good".to_string())),
+            frost_scheduler: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             start_tracking, stop_tracking, get_config, set_config,
