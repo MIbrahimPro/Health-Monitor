@@ -1,0 +1,252 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #050505;
+  color: #e0e0e0;
+  font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+.aegis-app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px;
+  gap: 14px;
+}
+
+/* --- Header --- */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #00ff00;
+  text-shadow: 0 0 12px rgba(0, 255, 0, 0.4);
+  letter-spacing: -0.5px;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #444;
+}
+
+.status-dot.active {
+  background: #00ff00;
+  box-shadow: 0 0 8px #00ff00;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.status-text {
+  font-size: 0.75rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.status-text.active {
+  color: #00ff00;
+}
+
+.fps-badge {
+  font-size: 0.65rem;
+  color: #888;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #222;
+}
+
+.init-btn {
+  background: linear-gradient(135deg, #00ff00 0%, #00cc00 100%);
+  color: #000;
+  border: none;
+  padding: 10px 22px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.init-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(0, 255, 0, 0.3);
+}
+
+.init-btn:active {
+  transform: translateY(0);
+}
+
+/* --- Main Content --- */
+.content {
+  flex: 1;
+  display: flex;
+  gap: 14px;
+  min-height: 0;
+}
+
+.panel {
+  background: #0a0a0a;
+  border: 1px solid #1a1a1a;
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.left-panel {
+  flex: 2.5;
+  gap: 12px;
+}
+
+.right-panel {
+  flex: 1;
+  gap: 8px;
+}
+
+.section-label {
+  font-size: 0.7rem;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-weight: 600;
+}
+
+/* --- BPM Section --- */
+.bpm-section {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bpm-value {
+  font-size: 4rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 20px currentColor;
+  transition: color 0.5s ease;
+}
+
+.bpm-label {
+  font-size: 1.2rem;
+  color: #555;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* Warmup progress bar */
+.warmup-bar {
+  width: 100%;
+  height: 4px;
+  background: #1a1a1a;
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.warmup-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00ff00, #00cc88);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.warmup-text {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  font-size: 0.65rem;
+  color: #555;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* --- Oscilloscope --- */
+.oscilloscope-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.oscilloscope-container {
+  flex: 1;
+  background: #000;
+  border-radius: 6px;
+  border: 1px solid #1a1a1a;
+  overflow: hidden;
+  min-height: 120px;
+}
+
+.oscilloscope-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.status-hint {
+  font-size: 0.7rem;
+  color: #444;
+  letter-spacing: 0.5px;
+}
+
+/* --- Camera Feed --- */
+.camera-container {
+  flex: 1;
+  background: #000;
+  border-radius: 6px;
+  border: 1px solid #1a1a1a;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 0;
+}
+
+.camera-feed {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.no-signal {
+  color: #333;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}

@@ -1,0 +1,19 @@
+--- AEGIS CAMERA LOOP STARTED ---
+Camera stream opened.
+Model found at: ../models/seeta_fd_frontal_v1.0.bin
+Face detection thread spawned.
+Entering main capture loop.
+[F3] FPS: 3.9
+[F14] FPS: 10.5
+[F24] FPS: 9.4
+[F35] FPS: 10.3
+[F45] FPS: 9.9
+[F56] FPS: 10.3
+[F67] FPS: 9.6
+[F78] FPS: 10.5
+[F88] FPS: 9.6
+[F98] FPS: 9.9
+[F109] FPS: 10.2
+[F120] FPS: 10.4
+[F130] FPS: 9.5
+[F141] FPS: 10.4

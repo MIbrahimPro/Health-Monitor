@@ -1,0 +1,8 @@
+--- AEGIS CAMERA LOOP STARTED ---
+Initializing camera Index(0)
+Opening stream...
+Stream opened successfully.
+Loading Face Detection Model...
+Face Detection Model loaded.
+Entering camera read loop. Detect every 15th frame, video every 5th.
+[F0] Face: x=0 y=168 w=184 h=184 ROI:y=168 h=55 detect=1100ms

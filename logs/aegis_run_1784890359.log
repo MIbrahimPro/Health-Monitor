@@ -1,0 +1,8 @@
+--- AEGIS CAMERA LOOP STARTED ---
+Initializing camera Index(0)
+Opening stream...
+Stream opened successfully.
+Loading Face Detection Model...
+Face Detection Model loaded.
+Entering camera read loop.
+[F0] Face: x=273 y=175 w=173 h=173 | ROI: y=175 h=51

@@ -1,0 +1,9 @@
+[package]
+name = "aegis-daemon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aegis-core = { path = "../aegis-core" }
+tokio = { version = "1.37.0", features = ["full"] }
+anyhow = "1.0.81"
