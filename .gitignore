@@ -1,0 +1,23 @@
+# Rust
+target/
+**/*.rs.bk
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environment
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Output folders
+output-data-*/
+
+# Misc
+.DS_Store
+misc/
