@@ -1,6 +1,8 @@
 # Aegis — Current State (updated 2026-07-24)
 
-**Next up:** `P1-remaining.md` (then `P1-ui.md`, then P2…P6 in order)
+**Next up:** `P1-remaining.md` Step 1 (then `P1-ui.md`, then P2…P6 in order)
+**Code is at commit** `7fd4559` — clean tree, builds with zero warnings, 5/5 tests green, bench label `patch_seeded` is the champion. No partial work is in flight.
+**Support manuals:** `CONCEPTS.md` (theory), `TESTING.md` (validation), `EXPERIMENTS.md` (A/B protocol + backlog), `TROUBLESHOOTING.md` (failure trees).
 
 ## What Aegis is
 
@@ -66,3 +68,4 @@ Regression rule: `std10 ≤ 5`, `maxJump10 ≤ 2`, `cov10 ≥ 90 %`, 5/5 synthet
 
 - 2026-07-24: Benchmark harness + shared pipeline module built; baseline recorded (commit a508bea)
 - 2026-07-24: Engine overhauled — patch-fused POS, bandpass+Welch, harmonic-aware tracker, respiration; 5/5 synthetic tests; std10 25→3.8 (commit 124762d)
+- 2026-07-24: Execution playbook written (P1–P6 step files) + support manuals (CONCEPTS, TESTING, EXPERIMENTS, TROUBLESHOOTING); per user direction, all remaining work is executed FROM these docs

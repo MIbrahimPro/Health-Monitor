@@ -7,6 +7,10 @@ This folder is the **single source of truth for finishing the project**. It is w
 | File | What it covers |
 |---|---|
 | `STATE.md` | Current state of the codebase, verified metrics, key discoveries, build/test commands. **Read first, always.** |
+| `CONCEPTS.md` | Domain primer (POS, Welch, SNR, harmonics, trackers…). **Read before touching signal code.** |
+| `TESTING.md` | The full testing manual: every test layer, bench CLI reference, regression gates, smoke checklists |
+| `EXPERIMENTS.md` | How to decide "which way is better": A/B protocol, decision rules, and the experiment backlog E1–E12 |
+| `TROUBLESHOOTING.md` | Failure playbook: build/test/camera/UI/model/git/perf trees + when and how to ask the user |
 | `P1-remaining.md` | Finish Phase 1: performance polish, backend lifecycle (start/stop/tray/settings) |
 | `P1-ui.md` | The premium UI overhaul (full design system + component-by-component spec) |
 | `P2.md` | Vision comfort overlay, window/context tracking, phone detection |
@@ -17,6 +21,7 @@ This folder is the **single source of truth for finishing the project**. It is w
 
 ## The execution loop (follow this exactly)
 
+0. First session only: read `STATE.md`, `CONCEPTS.md`, `TESTING.md` fully; skim `TROUBLESHOOTING.md` and `EXPERIMENTS.md` so you know they exist. When anything breaks → `TROUBLESHOOTING.md`. When choosing between designs/tunings → `EXPERIMENTS.md` protocol.
 1. Open `STATE.md`. Find the **Next up** pointer.
 2. Open the referenced phase file. Find the first unchecked `[ ]` step.
 3. Read the WHOLE step before touching code: Goal → Files → Instructions → Verify → If it fails.

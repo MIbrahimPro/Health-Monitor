@@ -26,6 +26,9 @@ Work top to bottom. Each step is self-contained.
    ```
    Also break the detection thread: send it the stop flag too, or drop `detect_tx` when the loop exits (dropping the sender ends its `while let Ok(..)`). Simplest: `break` the main loop, then after the loop `drop(detect_tx)` happens automatically as it goes out of scope — confirm the detection thread exits.
 3. After the loop, explicitly release: `drop(camera);` and log "Camera released."
+   **⚠ Call sites — the signature change breaks TWO existing callers; update both or the workspace won't compile:**
+   - `aegis-ui/src-tauri/src/lib.rs` → `start_camera_loop(tx, stop_flag)` (from AppState, see below)
+   - `aegis-daemon/src/main.rs` → `start_camera_loop(tx, Arc::new(AtomicBool::new(false)))` (daemon runs until killed; a real flag arrives with the P6 server)
 4. In `lib.rs`, hold shared state so the command handlers can coordinate:
    ```rust
    use std::sync::atomic::AtomicBool;
