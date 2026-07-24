@@ -6,6 +6,7 @@ import { RespCard } from "./components/RespCard";
 import { QualityCard } from "./components/QualityCard";
 import { WaveformCard } from "./components/WaveformCard";
 import { FocusCard } from "./components/FocusCard";
+import { MusicCard } from "./components/MusicCard";
 import "./App.css";
 
 function App() {
@@ -185,6 +186,8 @@ function App() {
         </div>
 
         <FocusCard />
+        
+        <MusicCard />
       </div>
     </div>
   );

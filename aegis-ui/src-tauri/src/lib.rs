@@ -247,6 +247,11 @@ fn get_intent_now() -> Intent {
     core_get_intent_now()
 }
 
+#[tauri::command]
+fn music_play_tag(tag: String) -> String {
+    format!("Scaffolded: Playing tag {}", tag)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -310,7 +315,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             start_tracking, stop_tracking, get_config, set_config,
             overlay_enable, overlay_disable, overlay_set_warmth,
-            get_context_summary, get_intent_now
+            get_context_summary, get_intent_now, music_play_tag
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
