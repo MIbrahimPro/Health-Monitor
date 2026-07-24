@@ -37,6 +37,7 @@ pub struct VitalStats {
     pub emotion: Option<String>,
     pub owner_present: Option<bool>,
     pub face_count: u32,
+    pub shoulder_surfing: bool,
 }
 
 macro_rules! log_msg {
@@ -142,7 +143,6 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>
                         let fh = ((bbox.height().max(0) as u32) * factor).min(full_h - y);
                         FaceBox { x, y, w: fw, h: fh }
                     });
-                
                 if let Ok(mut rect) = face_rect_for_detect.lock() {
                     *rect = result;
                 }
@@ -154,12 +154,15 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>
         let mut analyzer = FrameAnalyzer::new();
         let mut posture_monitor = PostureMonitor::new();
         let mut emotion_monitor = EmotionMonitor::new();
-        let face_recognizer = FaceRecognizer::new();
+        let mut face_recognizer = FaceRecognizer::new();
         let tracking_start = Instant::now();
         let mut frame_counter: u64 = 0;
         let mut fps_counter = 0u32;
         let mut fps_timer = Instant::now();
         let mut current_fps: f32 = 0.0;
+        
+        let mut face_count_history = vec![0; 6];
+        let mut face_count_idx = 0;
         
         let mut gray_full = Vec::new();
         let mut gray_downscaled = Vec::new();
@@ -220,9 +223,8 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>
             let mut posture = "Good".to_string();
             let mut emotion = None;
             let mut owner_present = None;
-            let mut face_count = 0;
+            let mut face_count = if current_face.is_some() { 1 } else { 0 }; // We don't have multi-face properly passing through pipeline yet. Scaffolded to 1 or 0.
             if let Some(face) = current_face {
-                face_count = 1; // Simplification since rustface pipeline above isn't easily modified
                 let cy = face.y as f32 + (face.h as f32 / 2.0);
                 posture = posture_monitor.process_frame(face.h as f32, cy, height as f32).as_str().to_string();
                 
@@ -230,6 +232,13 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>
                 emotion = emotion_monitor.process_frame(decoded.as_raw(), width, height, face.x, face.y, face.w, face.h);
                 owner_present = face_recognizer.is_owner_present(decoded.as_raw(), width, height, face.x, face.y, face.w, face.h);
             }
+
+            if frame_counter % 15 == 0 { // ~0.5s at 30fps
+                face_count_history[face_count_idx] = face_count;
+                face_count_idx = (face_count_idx + 1) % 6;
+            }
+            let multiple_faces_count = face_count_history.iter().filter(|&&c| c >= 2).count();
+            let shoulder_surfing = multiple_faces_count >= 4;
 
             // --- 5. Encode preview frame (every 5th frame, downscaled 2x) ---
             let mut frame_base64 = None;
@@ -294,6 +303,7 @@ pub fn start_camera_loop(sender: mpsc::Sender<VitalStats>, stop: Arc<AtomicBool>
                 emotion,
                 owner_present,
                 face_count,
+                shoulder_surfing,
             };
             if sender.blocking_send(stats).is_err() {
                 log_msg!(log_file, "Channel closed, exiting.");

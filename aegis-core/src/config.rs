@@ -13,6 +13,8 @@ pub struct Config {
     pub posture_module: bool,
     pub posture_enforce: bool,
     pub emotion_module: bool,
+    pub facerec_module: bool,
+    pub privacy_auto_frost: bool,
 }
 
 impl Default for Config {
@@ -25,6 +27,8 @@ impl Default for Config {
             posture_module: true,
             posture_enforce: false,
             emotion_module: false,
+            facerec_module: false,
+            privacy_auto_frost: false,
         }
     }
 }
