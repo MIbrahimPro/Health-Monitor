@@ -1,7 +1,8 @@
 # Aegis — Current State (updated 2026-07-24)
 
-**Phase 1 (Proof of Concept Backend & UI Overhaul):** ✅ Complete
-**Next up:** Phase 2 (P2.md) — Robust Vision Pipeline
+# Project State
+
+**Active Phase:** COMPLETE (v1.0.0 shipped) Pipeline
 **Code is at commit** `7fd4559` — clean tree, builds with zero warnings, 5/5 tests green, bench label `patch_seeded` is the champion. No partial work is in flight.
 **Support manuals:** `CONCEPTS.md` (theory), `TESTING.md` (validation), `EXPERIMENTS.md` (A/B protocol + backlog), `TROUBLESHOOTING.md` (failure trees).
 
