@@ -6,6 +6,7 @@ interface QualityCardProps {
   quality: number; // 0-100
   snrDb: number;
   fps: number;
+  isLoading?: boolean;
 }
 
 const getQualityColor = (val: number) => {
@@ -14,7 +15,7 @@ const getQualityColor = (val: number) => {
   return "var(--accent)";
 };
 
-export const QualityCard: React.FC<QualityCardProps> = ({ quality, snrDb, fps }) => {
+export const QualityCard: React.FC<QualityCardProps> = ({ quality, snrDb, fps, isLoading }) => {
   const displayQuality = useAnimatedNumber(quality);
   const colorVar = getQualityColor(quality);
   
@@ -56,8 +57,8 @@ export const QualityCard: React.FC<QualityCardProps> = ({ quality, snrDb, fps })
               className="ring-progress"
             />
           </svg>
-          <div className="ring-value" style={{ color: colorVar }}>
-            {displayQuality}
+          <div className={`ring-value ${isLoading ? 'skeleton' : ''}`} style={{ color: isLoading ? 'transparent' : colorVar, borderRadius: '50%' }}>
+            {isLoading ? "0" : displayQuality}
           </div>
         </div>
         

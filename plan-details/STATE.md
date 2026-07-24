@@ -1,6 +1,7 @@
 # Aegis — Current State (updated 2026-07-24)
 
-**Next up:** `P1-remaining.md` Step 1 (then `P1-ui.md`, then P2…P6 in order)
+**Phase 1 (Proof of Concept Backend & UI Overhaul):** ✅ Complete
+**Next up:** Phase 2 (P2.md) — Robust Vision Pipeline
 **Code is at commit** `7fd4559` — clean tree, builds with zero warnings, 5/5 tests green, bench label `patch_seeded` is the champion. No partial work is in flight.
 **Support manuals:** `CONCEPTS.md` (theory), `TESTING.md` (validation), `EXPERIMENTS.md` (A/B protocol + backlog), `TROUBLESHOOTING.md` (failure trees).
 
@@ -55,7 +56,7 @@ Regression rule: `std10 ≤ 5`, `maxJump10 ≤ 2`, `cov10 ≥ 90 %`, 5/5 synthet
 
 ## Environment
 
-- Linux, X11/Wayland unknown per session (`echo $XDG_SESSION_TYPE`), webcam at `/dev/video0` (640×480 YUYV ≈16.6 fps in room light), ffmpeg + ffprobe installed, node v24 + npm, Rust stable, python3 + numpy (no scipy, no cv2 assumptions beyond what exists).
+- Linux, Wayland session (`XDG_SESSION_TYPE=wayland`), webcam at `/dev/video0` (640×480 YUYV ≈16.6 fps in room light), ffmpeg + ffprobe installed, node v24 + npm, Rust stable, python3 + numpy (no scipy, no cv2 assumptions beyond what exists).
 - Git remote `origin` = github.com/MIbrahimPro/Health-Monitor.git, branch `main`. Push after every commit.
 - Runtime logs land in `logs/` (gitignored).
 
@@ -83,3 +84,5 @@ Regression rule: `std10 ≤ 5`, `maxJump10 ≤ 2`, `cov10 ≥ 90 %`, 5/5 synthet
 - 2026-07-24: UI Phase 1 Step 3 - Respiration and signal-quality cards with animated ring and live SNR
 - 2026-07-24: UI Phase 1 Step 4 - Cinematic waveform: rAF renderer, HiDPI, gradient stroke with comet head
 - 2026-07-24: UI Phase 1 Step 5 - Camera card status system, start/stop control states, remove inline styles
+- 2026-07-24: UI Phase 1 Step 6 - Polish pass: entrance stagger, skeletons, reduced-motion, window chrome
+- 2026-07-24: Phase 2 Step 1 - Comfort overlay window with click-through, warmth filter, and auto-scheduler

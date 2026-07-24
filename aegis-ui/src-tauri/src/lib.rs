@@ -1,9 +1,10 @@
 use aegis_core::camera::start_camera_loop;
 use aegis_core::config::Config;
+use chrono::{Local, Timelike};
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindowBuilder, WebviewUrl};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tokio::sync::mpsc;
@@ -11,6 +12,7 @@ use tokio::sync::mpsc;
 struct AppState {
     running: Arc<AtomicBool>,
     stop_flag: Mutex<Option<Arc<AtomicBool>>>,
+    overlay_scheduler: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
 }
 
 #[derive(Clone, Serialize)]
@@ -94,6 +96,80 @@ fn set_config(cfg: Config) -> String {
     }
 }
 
+#[tauri::command]
+fn overlay_enable(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    if app.get_webview_window("overlay").is_some() {
+        return Ok(()); // already enabled
+    }
+
+    let _is_wayland = std::env::var("XDG_SESSION_TYPE").unwrap_or_default() == "wayland";
+
+    let window = WebviewWindowBuilder::new(&app, "overlay", WebviewUrl::App("overlay.html".into()))
+        .title("Overlay")
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .focused(false)
+        .fullscreen(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let _ = window.set_ignore_cursor_events(true);
+
+    // Stop existing scheduler if any
+    if let Some(handle) = state.overlay_scheduler.lock().unwrap().take() {
+        handle.abort();
+    }
+
+    let app_clone = app.clone();
+    let scheduler = tauri::async_runtime::spawn(async move {
+        loop {
+            let now = Local::now();
+            let hour = now.hour() as f32 + (now.minute() as f32 / 60.0);
+            let mut warmth = 0.0;
+            
+            if hour >= 17.0 && hour <= 22.0 {
+                // Ramp 0.0 -> 0.35
+                warmth = ((hour - 17.0) / 5.0) * 0.35;
+            } else if hour > 22.0 || hour < 5.0 {
+                warmth = 0.35;
+            }
+            
+            if let Some(win) = app_clone.get_webview_window("overlay") {
+                let _ = win.eval(&format!("setWarmth({})", warmth));
+            } else {
+                break;
+            }
+            
+            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+        }
+    });
+
+    *state.overlay_scheduler.lock().unwrap() = Some(scheduler);
+
+    Ok(())
+}
+
+#[tauri::command]
+fn overlay_disable(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    if let Some(handle) = state.overlay_scheduler.lock().unwrap().take() {
+        handle.abort();
+    }
+    if let Some(window) = app.get_webview_window("overlay") {
+        let _ = window.close();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn overlay_set_warmth(app: AppHandle, warmth: f32) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("overlay") {
+        let _ = window.eval(&format!("setWarmth({})", warmth));
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -150,8 +226,12 @@ pub fn run() {
         .manage(AppState {
             running: Arc::new(AtomicBool::new(false)),
             stop_flag: Mutex::new(None),
+            overlay_scheduler: Mutex::new(None),
         })
-        .invoke_handler(tauri::generate_handler![start_tracking, stop_tracking, get_config, set_config])
+        .invoke_handler(tauri::generate_handler![
+            start_tracking, stop_tracking, get_config, set_config,
+            overlay_enable, overlay_disable, overlay_set_warmth
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

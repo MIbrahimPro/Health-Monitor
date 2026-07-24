@@ -5,6 +5,7 @@ import { HeroCard } from "./components/HeroCard";
 import { RespCard } from "./components/RespCard";
 import { QualityCard } from "./components/QualityCard";
 import { WaveformCard } from "./components/WaveformCard";
+import { FocusCard } from "./components/FocusCard";
 import "./App.css";
 
 function App() {
@@ -19,6 +20,12 @@ function App() {
   const [respBpm, setRespBpm] = useState<number | null>(null);
   const [quality, setQuality] = useState<number>(0);
   const [snrDb, setSnrDb] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
   
   const pulseHistoryRef = useRef<number[]>([]);
   const smoothedBpm10Ref = useRef<number | null>(null);
@@ -138,11 +145,12 @@ function App() {
           bpm60={bpm60} 
           faceFound={faceFound} 
           warmupProgress={warmupProgress} 
+          isLoading={isLoading}
         />
 
-        <RespCard respBpm={respBpm} />
+        <RespCard respBpm={respBpm} isLoading={isLoading} />
 
-        <QualityCard quality={quality} snrDb={snrDb} fps={fps} />
+        <QualityCard quality={quality} snrDb={snrDb} fps={fps} isLoading={isLoading} />
 
         <WaveformCard pulseHistoryRef={pulseHistoryRef} snrDb={snrDb} />
 
@@ -175,6 +183,8 @@ function App() {
             </div>
           )}
         </div>
+
+        <FocusCard />
       </div>
     </div>
   );

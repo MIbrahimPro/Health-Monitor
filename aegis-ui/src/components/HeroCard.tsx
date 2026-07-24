@@ -8,6 +8,7 @@ interface HeroCardProps {
   bpm60: number | null;
   faceFound: boolean;
   warmupProgress: number;
+  isLoading?: boolean;
 }
 
 const getHrColorVar = (val: number | null) => {
@@ -17,7 +18,7 @@ const getHrColorVar = (val: number | null) => {
   return "var(--accent)";
 };
 
-export const HeroCard: React.FC<HeroCardProps> = ({ bpm10, bpm30, bpm60, faceFound, warmupProgress }) => {
+export const HeroCard: React.FC<HeroCardProps> = ({ bpm10, bpm30, bpm60, faceFound, warmupProgress, isLoading }) => {
   const display10 = useAnimatedNumber(bpm10);
   const display30 = useAnimatedNumber(bpm30);
   const display60 = useAnimatedNumber(bpm60);
@@ -48,8 +49,8 @@ export const HeroCard: React.FC<HeroCardProps> = ({ bpm10, bpm30, bpm60, faceFou
 
       <div className="hero-value-container">
         {hasLock && <div className="hero-glow" style={{ background: `radial-gradient(closest-side, ${colorVar}20, transparent)` }} />}
-        <div className={`hero-value ${!hasLock ? 'shimmer' : ''}`} style={{ color: colorVar }}>
-          {hasLock ? display10 : "--"}
+        <div className={`hero-value ${isLoading ? 'skeleton' : !hasLock ? 'shimmer' : ''}`} style={{ color: isLoading ? 'transparent' : colorVar }}>
+          {isLoading ? "00" : hasLock ? display10 : "--"}
         </div>
       </div>
 

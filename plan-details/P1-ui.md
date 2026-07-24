@@ -110,7 +110,7 @@ Rules: backgrounds only from `--bg-*`; never pure #000/#fff; text only the three
 **Verify:** dev run through the full lifecycle: idle → start → no-face → face → locked → stop → restart. Every state visually distinct; zero inline styles left (`grep -n "style={{" src/App.tsx` → only the dynamic color/width bindings allowed, ideally none).
 **Commit:** `Camera card status system, start/stop control states, remove inline styles`
 
-## Step 6 — Polish pass `[ ]`
+## Step 6 — Polish pass `[x]`
 
 **Instructions:**
 1. Entrance stagger on first mount; `prefers-reduced-motion` guards.
@@ -126,6 +126,6 @@ Rules: backgrounds only from `--bg-*`; never pure #000/#fff; text only the three
 
 ## Definition of done
 
-- [ ] Steps 1–6 checked, `npm run build` clean, lifecycle smoke test passes.
-- [ ] No external network requests at runtime (devtools network tab empty besides local assets).
-- [ ] STATE.md Next up → `P2.md`; changelog + `plan.md` Phase 1 marked ✅ complete.
+- [x] Steps 1–6 checked, `npm run build` clean, lifecycle smoke test passes.
+- [x] No external network requests at runtime (devtools network tab empty besides local assets).
+- [x] STATE.md Next up → `P2.md`; changelog + `plan.md` Phase 1 marked ✅ complete.

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Aegis Overlay</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: transparent;
+      pointer-events: none; /* additional safety for click-through */
+    }
+    #tint {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255, 147, 41, 0);
+      pointer-events: none;
+      transition: background-color 1s ease-in-out;
+    }
+    #grain {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      opacity: 0.05;
+      background-size: 280px;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    }
+  </style>
+</head>
+<body>
+  <div id="tint"></div>
+  <div id="grain"></div>
+  <script>
+    // Called by Tauri backend
+    function setWarmth(warmth) {
+      // Clamp between 0.0 and 0.6
+      const safeWarmth = Math.max(0.0, Math.min(0.6, parseFloat(warmth) || 0));
+      document.getElementById('tint').style.backgroundColor = `rgba(255, 147, 41, ${safeWarmth})`;
+    }
+  </script>
+</body>
+</html>

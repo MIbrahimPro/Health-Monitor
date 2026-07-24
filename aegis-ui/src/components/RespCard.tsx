@@ -4,9 +4,10 @@ import "./RespCard.css";
 
 interface RespCardProps {
   respBpm: number | null;
+  isLoading?: boolean;
 }
 
-export const RespCard: React.FC<RespCardProps> = ({ respBpm }) => {
+export const RespCard: React.FC<RespCardProps> = ({ respBpm, isLoading }) => {
   const displayResp = useAnimatedNumber(respBpm);
   const hasLock = respBpm !== null;
   const animDuration = hasLock && respBpm > 0 ? (60 / respBpm).toFixed(2) + "s" : "0s";
@@ -16,8 +17,8 @@ export const RespCard: React.FC<RespCardProps> = ({ respBpm }) => {
       <h2 className="card-title">Respiration</h2>
       
       <div className="resp-content">
-        <div className="card-value" style={{ color: hasLock ? 'var(--accent-warm)' : 'var(--text-low)' }}>
-          {hasLock ? displayResp : "--"}
+        <div className={`card-value ${isLoading ? 'skeleton' : ''}`} style={{ color: isLoading ? 'transparent' : (hasLock ? 'var(--accent-warm)' : 'var(--text-low)') }}>
+          {isLoading ? "00" : (hasLock ? displayResp : "--")}
         </div>
         <div className="resp-unit">breaths/min</div>
         

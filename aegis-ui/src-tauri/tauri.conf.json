@@ -12,9 +12,11 @@
   "app": {
     "windows": [
       {
-        "title": "aegis-ui",
-        "width": 800,
-        "height": 600
+        "title": "Aegis — Vitals",
+        "width": 980,
+        "height": 640,
+        "minWidth": 980,
+        "minHeight": 640
       }
     ],
     "security": {
